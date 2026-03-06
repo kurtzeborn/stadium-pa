@@ -57,23 +57,58 @@ A Windows desktop app (C# / WPF) for managing audio during lacrosse games. The a
 
 ### 4. National Anthem Button
 - Plays a local audio file (`.mp3` or `.wav`) configured in app settings
+- **Pre-loaded into memory on startup** — no delay when pressed
 - Simple playback — press to play, press again to stop
+- Elapsed / total time progress indicator shown during playback
 - Spotify will typically already be silent when this is used (announcer will have ducked/paused Spotify before asking crowd to stand)
 - File path configured in settings (file picker)
 
 ### 5. Goal Celebration Button
 - Plays a local audio file (`.mp3` or `.wav`) configured in app settings
-- Simple playback — press to play, press again to stop
-- Spotify will typically already be silent during active play, so no ducking needed
+- **Pre-loaded into memory on startup** — no delay when pressed
+- Elapsed / total time progress indicator shown during playback
+- No looping — file plays once and ends naturally (audio file fades out on its own)
+- Spotify will typically already be silent during active play
+- Multi-step flow during a goal:
+  1. **Press Goal** → celebration plays at 100% volume
+  2. **Press DIM** → celebration lowers to 10% → announcer calls out who scored
+  3. **Press DIM again** → celebration returns to 100%
+  4. **Press FADE OUT** → celebration fades to 0 and stops (play is resuming)
 - File path configured in settings (file picker)
 
-### 6. Duck / Announce Button
-- A toggle button for when the announcer is about to speak on the PA mic
-- On press: smoothly fades Spotify's per-process volume → 0 over ~1 second (Core Audio `ISimpleAudioVolume`)
-- On release (or second press): smoothly restores Spotify volume back to its previous level
-- Works regardless of which playlist is playing — general-purpose Spotify ducking
-- Visual indicator shows ducked state (e.g., button stays highlighted while active)
-- This is the primary way music gets turned down before announcements, anthem, etc.
+### 6. Audio Control Buttons
+
+Three buttons for controlling whatever audio is currently playing (Spotify or local files).
+All three act on the **active audio source** — whichever of Spotify or local audio is currently producing sound. If both are somehow playing, they act on both.
+
+#### 6a. DIM (toggle)
+- **First press**: smoothly fades active audio → **10%** over ~1 second
+- **Second press**: smoothly restores back to previous volume level
+- Use case: talking over music (e.g., announcing a goal scorer while celebration plays, or making a quick comment over pregame music)
+- Visual indicator shows dimmed state
+- Audio continues playing — just quieter
+
+#### 6b. FADE OUT (toggle)
+- **First press**: smoothly fades active audio → **0%** over ~1 second, then **pauses/stops** playback
+- **Second press**: **resumes** playback and smoothly restores volume
+- Use case: ending a segment cleanly (e.g., pregame winding down, stopping goal celebration when play resumes)
+- Visual indicator shows faded-out state
+
+#### 6c. KILL (instant)
+- **Press**: immediately sets volume to **0%** and **pauses/stops** playback — no fade
+- Not a toggle — one-shot emergency cut
+- Use case: something unexpected happens, wrong song playing, need instant silence
+- Playback must be manually restarted after a kill
+
+### 7. Always on Top
+- App window stays above all other windows (Spotify, browser, etc.)
+- Enabled by default — toggle in title bar or settings
+- Uses `Topmost = true` in WPF
+
+### 8. Sleep / Screen Suppression
+- App prevents Windows from sleeping the display or the machine while running
+- Uses `SetThreadExecutionState` P/Invoke (`ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED`)
+- Automatically restored when app closes
 
 ## Key Technical Components
 
@@ -87,7 +122,48 @@ MMDeviceEnumerator
           → SimpleAudioVolume.Volume = 0.0f .. 1.0f
 ```
 - Smooth fade: timer-based interpolation (e.g., 50ms steps over 1 second)
-- Immediate mute also available for fast ducking
+- Three audio control modes:
+  - **DIM**: fade → 10%, keep playing (toggle)
+  - **FADE OUT**: fade → 0%, then pause/stop (toggle)
+  - **KILL**: instant → 0% + stop (one-shot)
+- Fader needs to be reusable for both Spotify per-process volume and NAudio playback volume
+- Must detect active audio source: Spotify (via Core Audio session), local audio (via NAudio playback state)
+
+### Audio File Pre-loading
+- Anthem and Goal celebration files are read into memory (`MemoryStream`) on app startup
+- Avoids 200-500ms NAudio initialization delay at playback time
+- Files are re-loaded if the path changes in settings
+
+### DIM / FADE OUT / KILL State Machine
+```
+                   ┌──────────────┐
+          ┌───────►│   NORMAL     │◄────────────────────┐
+          │        │  (vol 100%)  │                     │
+          │        └──┬───┬───┬──┘                     │
+          │    DIM    │   │   │  KILL                   │
+          │           ▼   │   ▼                         │
+          │   ┌───────────┐   ┌──────────┐              │
+   DIM    │   │  DIMMED   │   │  KILLED  │  (manual     │
+  (undo)  │   │ (vol 10%) │   │ (vol 0%, │   restart    │
+          │   │ playing   │   │  stopped)│   required)  │
+          │   └──┬────┬───┘   └──────────┘              │
+          │      │    │                                 │
+          └──────┘    │ FADE OUT                        │
+                      ▼                                 │
+              ┌──────────────┐                          │
+              │  FADED OUT   │──── FADE OUT (undo) ─────┘
+              │  (vol 0%,    │
+              │   stopped)   │
+              └──────────────┘
+```
+**Key transitions:**
+- NORMAL → DIM → NORMAL (toggle)
+- NORMAL → FADE OUT → NORMAL (toggle)
+- DIMMED → FADE OUT → fades from 10% → 0% + stops (does not restore first)
+- DIMMED → KILL → instant 0% + stop (clears DIM state)
+- FADED OUT → DIM → no-op (audio is stopped, nothing to dim)
+- FADED OUT → KILL → no-op (already silent)
+- KILLED → any button except manual restart → no-op
 
 ### Media Key Simulation
 ```csharp
@@ -98,6 +174,7 @@ static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExt
 // VK_MEDIA_NEXT_TRACK = 0xB0
 // VK_MEDIA_PREV_TRACK = 0xB1
 ```
+> **⚠ Media Key Conflict**: Media keys are broadcast system-wide. If a browser (YouTube, Twitch) or other media app is open, play/pause/next will affect all of them. Close all other media-capable apps before the game.
 
 ### Local Audio Playback (NAudio)
 ```csharp
@@ -118,13 +195,18 @@ waveOut.Play();
 ║                                                      ║
 ╠══════════════════════════════════════════════════════╣
 ║                                                      ║
-║  SPOTIFY        ════════════════════●══════           ║
+║  SPOTIFY        ════════════════════●══════          ║
 ║                                                      ║
-║  [⏮ PREV]      [⏯ PLAY/PAUSE]      [⏭ NEXT]       ║
+║  [⏮ PREV]      [⏯ PLAY/PAUSE]      [⏭ NEXT]         ║
 ║                                                      ║
-║  ┌────────────────────────────────────────────────┐  ║
-║  │   🎙 DUCK (ANNOUNCE)                — toggle  │  ║
-║  └────────────────────────────────────────────────┘  ║
+╠══════════════════════════════════════════════════════╣
+║  AUDIO CONTROLS                                      ║
+║                                                      ║
+║  ┌─────────────┐ ┌───────────────┐ ┌───────────────┐ ║
+║  │  🔉 DIM     │ │  🔇 FADE OUT │ │  ⚠ KILL       │ ║
+║  │  ↓10%       │ │  ↓0% + stop   │ │  instant off  │ ║
+║  │  (toggle)   │ │  (toggle)     │ │  (one-shot)   │ ║
+║  └─────────────┘ └───────────────┘ └───────────────┘ ║
 ║                                                      ║
 ╠══════════════════════════════════════════════════════╣
 ║                                                      ║
@@ -132,6 +214,7 @@ waveOut.Play();
 ║  │                    │  │                        │  ║
 ║  │   🏳 NATIONAL      │  │   🥅 GOAL!             │  ║
 ║  │     ANTHEM         │  │     CELEBRATION        │  ║
+║  │   1:23 / 2:10      │  │   0:45 / 1:02          │  ║
 ║  │                    │  │                        │  ║
 ║  └────────────────────┘  └────────────────────────┘  ║
 ║                                                      ║
@@ -145,9 +228,11 @@ waveOut.Play();
 ╚══════════════════════════════════════════════════════╝
 ```
 
-- Large, high-contrast buttons for game-day use
-- Buttons should be big enough to hit quickly without precise mouse targeting
+- **Dark theme** — high-contrast dark background for readability in sun or shade
+- **Touch-first design** — primary input is a touch screen laptop; all buttons must be large enough to avoid fat-fingering (minimum ~80x80dp hit targets, generous spacing between buttons)
+- Keyboard shortcuts available as a secondary input method
 - Visual feedback: active/playing state highlighted
+- Always-on-top by default
 
 ## NuGet Dependencies
 
@@ -190,6 +275,18 @@ stadium-pa/
 - Location: `%APPDATA%\StadiumPA\settings.json`
 - Load on startup, save on change
 
+## Pre-Game Setup Checklist
+
+The app should display or the operator should verify before each game:
+
+- [ ] Correct audio output device selected (headphone jack → PA system)
+- [ ] Windows power/sleep set to "Never" (or app is suppressing it)
+- [ ] Spotify open with playlists downloaded for offline use
+- [ ] Pregame playlist selected and ready
+- [ ] Anthem and Goal celebration files loaded (verify with a quick test play)
+- [ ] Close all other media-capable apps (browsers, media players) to avoid media key conflicts
+- [ ] Master volume and Spotify volume at desired starting levels
+
 ## Spotify Playlists
 
 Three curated playlists, all downloaded for offline use:
@@ -217,16 +314,16 @@ There are **4 manual playlist switches** during a game. Each is a quick tap in t
 1. **Pre-game setup**: Open Spotify, select **Pregame** playlist, press play
 2. **Launch Stadium PA**: Master volume and Spotify volume sliders ready
 3. **Pregame music**: Spotify plays pregame playlist; adjust volume with sliders
-4. **Pregame winding down**: Press Duck → Spotify fades out → make announcements over mic
+4. **Pregame winding down**: Press FADE OUT → Spotify fades to silence + pauses → make announcements over mic
 5. **National Anthem**: Press Anthem button → anthem plays → let it finish
 6. 🔄 **Switch Spotify to Timeout playlist**
 7. **Pre-game timeout song**: Press Timeout Next Song → plays a song while teams warm up
-8. **Game starts**: Pause Spotify; music is off during active play
-9. **Goal scored**: Press Goal button → celebration plays (Spotify already silent)
+8. **Game starts**: Press FADE OUT (or KILL) → music stops; silence during active play
+9. **Goal scored**: Press Goal → celebration at 100% → DIM to 10% → announce scorer → DIM again to 100% → FADE OUT to stop when play resumes
 10. **Timeout (1st half)**: Press Timeout Next Song → next song in timeout playlist
 11. 🔄 **Halftime starts — switch Spotify to Halftime playlist**, press play
 12. **Halftime music**: Spotify plays halftime playlist
-13. **Halftime ending**: Press Duck → make announcements → teams return
+13. **Halftime ending**: Press FADE OUT → Spotify fades + pauses → make announcements
 14. 🔄 **Switch Spotify back to Timeout playlist**
 15. **Timeout (2nd half)**: Press Timeout Next Song → continues through timeout playlist
 16. **Game ends**: *(Optional)* 🔄 Switch to pregame/halftime playlist, or no music
@@ -235,26 +332,35 @@ There are **4 manual playlist switches** during a game. Each is a quick tap in t
 
 ### Phase 1: Core Skeleton
 - [ ] Create WPF project (.NET 8)
-- [ ] Main window layout with placeholder buttons
+- [ ] Dark theme, touch-friendly layout with placeholder buttons
 - [ ] Master volume slider (Core Audio)
+- [ ] Always-on-top window (default on, toggle)
+- [ ] Sleep/screen suppression (`SetThreadExecutionState`)
 
 ### Phase 2: Spotify Control
 - [ ] Media key simulation (play/pause/next/prev)
 - [ ] Spotify per-process volume slider
 - [ ] Spotify process detection
+- [ ] Keyboard shortcuts for core controls (KILL as global hotkey)
 
 ### Phase 3: Local Audio Playback
 - [ ] NAudio playback engine for local files
+- [ ] Audio file pre-loading into memory on startup
 - [ ] Anthem button with file picker in settings
 - [ ] Goal button with file picker in settings
+- [ ] Elapsed / total time progress indicator on Anthem and Goal
 
-### Phase 4: Duck / Announce
-- [ ] Volume fader utility (smooth interpolation)
-- [ ] Duck toggle button — fade Spotify down/up
-- [ ] Visual indicator for ducked state
+### Phase 4: Audio Control Buttons (DIM / FADE OUT / KILL)
+- [ ] Volume fader utility (smooth interpolation, configurable target level)
+- [ ] Active audio source detection (Spotify session, local playback, or both)
+- [ ] DIM toggle — fade to 10%, restore to previous
+- [ ] FADE OUT toggle — fade to 0% + pause/stop, restore + resume
+- [ ] KILL one-shot — instant 0% + stop
+- [ ] Visual indicators for dimmed / faded-out states
+- [ ] State machine: DIM → FADE OUT transitions correctly, KILL clears all states
 
 ### Phase 5: Polish
-- [ ] Large, high-contrast game-day UI
 - [ ] Settings persistence (JSON)
 - [ ] Error handling (missing files, Spotify not running)
-- [ ] Keyboard shortcuts for quick access
+- [ ] Pre-game checklist screen or verification
+- [ ] Final touch/UX pass — button sizing, spacing, visual feedback
