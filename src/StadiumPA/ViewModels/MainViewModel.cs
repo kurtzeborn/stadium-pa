@@ -2,15 +2,17 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using System.Windows.Threading;
+using StadiumPA.Models;
 using StadiumPA.Services;
 
 namespace StadiumPA.ViewModels;
 
 /// <summary>
-/// Main view model — Phases 1–4: master volume, mute, always-on-top,
+/// Main view model — Phases 1–5: master volume, mute, always-on-top,
 /// Spotify media key control, Spotify per-process volume, keyboard shortcuts,
 /// local audio playback (anthem + goal) with elapsed/total time indicators,
-/// DIM/FADE OUT/KILL audio control state machine with smooth volume fading.
+/// DIM/FADE OUT/KILL audio control state machine with smooth volume fading,
+/// settings persistence, error handling, and pre-game checklist.
 /// </summary>
 public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 {
@@ -21,6 +23,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private readonly AudioPlayerService _goalPlayer;
     private readonly DispatcherTimer _playbackTimer;
     private readonly VolumeFader _fader;
+    private readonly AppSettings _settings;
 
     private float _masterVolumeLevel;
     private bool _isMuted;
@@ -38,11 +41,19 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private bool _anthemWasPausedByUs;
     private bool _goalWasPausedByUs;
 
-    private const float DimLevel = 0.10f;
-    private const int FadeDurationMs = 1000;
+    // Settings-backed values (Phase 5)
+    private float _dimLevel;
+    private int _fadeDurationMs;
+    private string? _statusMessage;
 
     public MainViewModel()
     {
+        // Load persisted settings (returns defaults if no file exists)
+        _settings = SettingsService.Load();
+        _dimLevel = _settings.DimLevel;
+        _fadeDurationMs = _settings.FadeDurationMs;
+        _alwaysOnTop = _settings.AlwaysOnTop;
+
         _masterVolume = new MasterVolumeService();
         _sleepSuppression = new SleepSuppressionService();
         _spotifyVolume = new SpotifyVolumeService();
@@ -61,16 +72,22 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         // Enable sleep suppression on startup
         _sleepSuppression.Enable();
 
-        // Read current system volume
-        _masterVolumeLevel = _masterVolume.Volume;
+        // Apply saved default volumes
+        _masterVolumeLevel = _settings.DefaultMasterVolume;
+        _masterVolume.Volume = _masterVolumeLevel;
         _isMuted = _masterVolume.IsMuted;
 
-        // Read Spotify state
+        // Apply saved Spotify volume
+        _spotifyVolumeLevel = _settings.DefaultSpotifyVolume;
         _isSpotifyRunning = _spotifyVolume.IsSpotifyRunning;
         if (_isSpotifyRunning)
         {
-            _spotifyVolumeLevel = _spotifyVolume.Volume ?? 0.80f;
+            _spotifyVolume.Volume = _spotifyVolumeLevel;
         }
+
+        // Pre-load audio files from saved paths
+        TryLoadAudioFile(_anthemPlayer, _settings.AnthemFilePath, "Anthem");
+        TryLoadAudioFile(_goalPlayer, _settings.GoalFilePath, "Goal");
 
         // Commands
         ToggleMuteCommand = new RelayCommand(ToggleMute);
@@ -121,6 +138,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             if (SetField(ref _isMuted, value))
             {
                 _masterVolume.IsMuted = _isMuted;
+                RefreshChecklist();
             }
         }
     }
@@ -136,7 +154,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public bool AlwaysOnTop
     {
         get => _alwaysOnTop;
-        set => SetField(ref _alwaysOnTop, value);
+        set
+        {
+            if (SetField(ref _alwaysOnTop, value))
+                SaveSettings();
+        }
     }
 
     public ICommand ToggleAlwaysOnTopCommand { get; }
@@ -192,6 +214,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 OnPropertyChanged(nameof(SpotifyVolumePercent));
             }
         }
+        RefreshChecklist();
     }
 
     #endregion
@@ -291,7 +314,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         var fromS = _spotifyVolume.Volume ?? _savedSpotifyVol;
         var fromA = _anthemPlayer.Volume;
         var fromG = _goalPlayer.Volume;
-        _fader.Start(FadeDurationMs, t =>
+        _fader.Start(_fadeDurationMs, t =>
         {
             SetAllActiveVolumes(
                 Lerp(fromS, targetLevel, t),
@@ -308,7 +331,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         var fromS = _spotifyVolume.Volume ?? 0f;
         var fromA = _anthemPlayer.Volume;
         var fromG = _goalPlayer.Volume;
-        _fader.Start(FadeDurationMs, t =>
+        _fader.Start(_fadeDurationMs, t =>
         {
             SetAllActiveVolumes(
                 Lerp(fromS, _savedSpotifyVol, t),
@@ -326,7 +349,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             case AudioControlState.Normal:
                 SaveActiveVolumes();
                 SetAudioState(AudioControlState.Dimmed);
-                FadeToLevel(DimLevel);
+                FadeToLevel(_dimLevel);
                 break;
 
             case AudioControlState.Dimmed:
@@ -427,7 +450,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     /// </summary>
     public void LoadAnthemFile(string path)
     {
-        _anthemPlayer.LoadFile(path);
+        try
+        {
+            _anthemPlayer.LoadFile(path);
+            StatusMessage = null;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Anthem load error: {ex.Message}";
+        }
         OnPropertyChanged(nameof(AnthemFileDisplay));
         OnPropertyChanged(nameof(AnthemTimeDisplay));
     }
@@ -437,7 +468,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     /// </summary>
     public void LoadGoalFile(string path)
     {
-        _goalPlayer.LoadFile(path);
+        try
+        {
+            _goalPlayer.LoadFile(path);
+            StatusMessage = null;
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Goal load error: {ex.Message}";
+        }
         OnPropertyChanged(nameof(GoalFileDisplay));
         OnPropertyChanged(nameof(GoalTimeDisplay));
     }
@@ -445,13 +484,19 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private void BrowseAnthemFile()
     {
         var path = ShowAudioFileDialog("Select National Anthem File");
-        if (path is not null) LoadAnthemFile(path);
+        if (path is null) return;
+        LoadAnthemFile(path);
+        SaveSettings();
+        RefreshChecklist();
     }
 
     private void BrowseGoalFile()
     {
         var path = ShowAudioFileDialog("Select Goal Celebration File");
-        if (path is not null) LoadGoalFile(path);
+        if (path is null) return;
+        LoadGoalFile(path);
+        SaveSettings();
+        RefreshChecklist();
     }
 
     private static string? ShowAudioFileDialog(string title)
@@ -505,6 +550,126 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     #endregion
 
+    #region Settings & Status (Phase 5)
+
+    /// <summary>Dim level (0.0–1.0). Persisted to settings.</summary>
+    public float DimLevel
+    {
+        get => _dimLevel;
+        set
+        {
+            if (SetField(ref _dimLevel, Math.Clamp(value, 0.01f, 1f)))
+            {
+                OnPropertyChanged(nameof(DimLevelPercent));
+                OnPropertyChanged(nameof(DimButtonSubtext));
+                SaveSettings();
+            }
+        }
+    }
+
+    public string DimLevelPercent => $"{(int)(_dimLevel * 100)}%";
+
+    public string DimButtonSubtext => $"\u2193{DimLevelPercent} (toggle)";
+
+    /// <summary>Fade duration in seconds (0.2–3.0). Persisted as milliseconds.</summary>
+    public float FadeDurationSeconds
+    {
+        get => _fadeDurationMs / 1000f;
+        set
+        {
+            var ms = (int)(Math.Clamp(value, 0.2f, 3.0f) * 1000);
+            if (_fadeDurationMs != ms)
+            {
+                _fadeDurationMs = ms;
+                OnPropertyChanged(nameof(FadeDurationSeconds));
+                OnPropertyChanged(nameof(FadeDurationDisplay));
+                SaveSettings();
+            }
+        }
+    }
+
+    public string FadeDurationDisplay => $"{_fadeDurationMs / 1000.0:F1}s";
+
+    /// <summary>Status/error message shown in the UI. Null when no message.</summary>
+    public string? StatusMessage
+    {
+        get => _statusMessage;
+        private set => SetField(ref _statusMessage, value);
+    }
+
+    /// <summary>
+    /// Loads an audio file on startup with error handling. Does not save settings.
+    /// </summary>
+    private void TryLoadAudioFile(AudioPlayerService player, string? path, string label)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        try
+        {
+            player.LoadFile(path);
+            if (!player.IsLoaded)
+                StatusMessage = $"{label} file not found: {System.IO.Path.GetFileName(path)}";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"{label} load failed: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Snapshots current state to %APPDATA%\StadiumPA\settings.json.
+    /// </summary>
+    private void SaveSettings()
+    {
+        _settings.AnthemFilePath = _anthemPlayer.FilePath;
+        _settings.GoalFilePath = _goalPlayer.FilePath;
+        _settings.FadeDurationMs = _fadeDurationMs;
+        _settings.DimLevel = _dimLevel;
+        _settings.DefaultMasterVolume = _masterVolumeLevel;
+        _settings.DefaultSpotifyVolume = _spotifyVolumeLevel;
+        _settings.AlwaysOnTop = _alwaysOnTop;
+        SettingsService.Save(_settings);
+    }
+
+    #endregion
+
+    #region Pre-Game Checklist (Phase 5)
+
+    public bool IsAnthemReady => _anthemPlayer.IsLoaded;
+    public bool IsGoalReady => _goalPlayer.IsLoaded;
+    public bool IsSpotifyReady => _isSpotifyRunning;
+    public bool IsVolumeReady => _masterVolumeLevel > 0.01f && !_isMuted;
+
+    public string AnthemStatusText => _anthemPlayer.IsLoaded
+        ? $"\u2705 Anthem: {System.IO.Path.GetFileName(_anthemPlayer.FilePath!)}"
+        : "\u274c Anthem not configured";
+
+    public string GoalStatusText => _goalPlayer.IsLoaded
+        ? $"\u2705 Goal: {System.IO.Path.GetFileName(_goalPlayer.FilePath!)}"
+        : "\u274c Goal not configured";
+
+    public string SpotifyStatusText => _isSpotifyRunning
+        ? "\u2705 Spotify detected"
+        : "\u26a0 Spotify not detected";
+
+    public string VolumeStatusText => IsVolumeReady
+        ? $"\u2705 Volume: {MasterVolumePercent}"
+        : _isMuted ? "\u26a0 System audio is muted" : "\u26a0 Master volume is at 0%";
+
+    private void RefreshChecklist()
+    {
+        OnPropertyChanged(nameof(IsAnthemReady));
+        OnPropertyChanged(nameof(IsGoalReady));
+        OnPropertyChanged(nameof(IsSpotifyReady));
+        OnPropertyChanged(nameof(IsVolumeReady));
+        OnPropertyChanged(nameof(AnthemStatusText));
+        OnPropertyChanged(nameof(GoalStatusText));
+        OnPropertyChanged(nameof(SpotifyStatusText));
+        OnPropertyChanged(nameof(VolumeStatusText));
+    }
+
+    #endregion
+
     #region INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -524,6 +689,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public void Dispose()
     {
+        SaveSettings();
         _fader.Dispose();
         _playbackTimer.Stop();
         _anthemPlayer.PlaybackStateChanged -= OnAnyPlaybackStateChanged;

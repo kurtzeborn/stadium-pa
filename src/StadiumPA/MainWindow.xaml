@@ -185,6 +185,7 @@
         </Style>
     </Window.Resources>
 
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Margin="8">
 
         <!-- Title Bar area -->
@@ -223,7 +224,7 @@
                     Command="{Binding DimCommand}">
                 <StackPanel>
                     <TextBlock Text="🔉 DIM" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#DDBB44"/>
-                    <TextBlock Text="↓10% (toggle)" FontSize="11" HorizontalAlignment="Center" Foreground="#AA8833"/>
+                    <TextBlock Text="{Binding DimButtonSubtext}" FontSize="11" HorizontalAlignment="Center" Foreground="#AA8833"/>
                 </StackPanel>
             </Button>
             <Button Style="{StaticResource FadeOutButton}"
@@ -302,7 +303,7 @@
         <!-- Settings -->
         <Separator Background="#444444" Margin="8,2"/>
         <TextBlock Style="{StaticResource SectionLabel}" Text="SETTINGS"/>
-        <StackPanel Margin="12,0,12,12">
+        <StackPanel Margin="12,0,12,4">
             <DockPanel Margin="0,2">
                 <Button Style="{StaticResource ToggleIconButton}" Content="📂" DockPanel.Dock="Right"
                         Command="{Binding BrowseAnthemFileCommand}" ToolTip="Browse for anthem file"
@@ -319,7 +320,101 @@
                     <Run Text="Goal: "/><Run Text="{Binding GoalFileDisplay, Mode=OneWay}" Foreground="#DDD"/>
                 </TextBlock>
             </DockPanel>
+            <!-- Dim Level & Fade Duration -->
+            <DockPanel Margin="0,6,0,2">
+                <TextBlock Text="{Binding DimLevelPercent}" Foreground="White" FontSize="13"
+                           Width="40" TextAlignment="Right" VerticalAlignment="Center"
+                           DockPanel.Dock="Right"/>
+                <TextBlock Text="Dim Level:" Foreground="#AAA" FontSize="12"
+                           VerticalAlignment="Center" Width="90"/>
+                <Slider Minimum="0.01" Maximum="0.50" SmallChange="0.01" LargeChange="0.05"
+                        Value="{Binding DimLevel, Mode=TwoWay}"
+                        Style="{StaticResource DarkSlider}"/>
+            </DockPanel>
+            <DockPanel Margin="0,2">
+                <TextBlock Text="{Binding FadeDurationDisplay}" Foreground="White" FontSize="13"
+                           Width="40" TextAlignment="Right" VerticalAlignment="Center"
+                           DockPanel.Dock="Right"/>
+                <TextBlock Text="Fade Speed:" Foreground="#AAA" FontSize="12"
+                           VerticalAlignment="Center" Width="90"/>
+                <Slider Minimum="0.2" Maximum="3.0" SmallChange="0.1" LargeChange="0.5"
+                        Value="{Binding FadeDurationSeconds, Mode=TwoWay}"
+                        Style="{StaticResource DarkSlider}"/>
+            </DockPanel>
+        </StackPanel>
+
+        <!-- Status Message (hidden when empty) -->
+        <TextBlock Text="{Binding StatusMessage}" Foreground="#FF8866" FontSize="12"
+                   Margin="12,0,12,4" TextWrapping="Wrap">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Visibility" Value="Visible"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding StatusMessage}" Value="{x:Null}">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding StatusMessage}" Value="">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+
+        <!-- Pre-Game Checklist -->
+        <Separator Background="#444444" Margin="8,2"/>
+        <TextBlock Style="{StaticResource SectionLabel}" Text="PRE-GAME CHECKLIST"/>
+        <StackPanel Margin="12,0,12,12">
+            <TextBlock Text="{Binding AnthemStatusText}" FontSize="13" Margin="0,2">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="#66CC66"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsAnthemReady}" Value="False">
+                                <Setter Property="Foreground" Value="#FF8866"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <TextBlock Text="{Binding GoalStatusText}" FontSize="13" Margin="0,2">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="#66CC66"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsGoalReady}" Value="False">
+                                <Setter Property="Foreground" Value="#FF8866"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <TextBlock Text="{Binding SpotifyStatusText}" FontSize="13" Margin="0,2">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="#66CC66"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsSpotifyReady}" Value="False">
+                                <Setter Property="Foreground" Value="#DDAA44"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <TextBlock Text="{Binding VolumeStatusText}" FontSize="13" Margin="0,2">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="#66CC66"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsVolumeReady}" Value="False">
+                                <Setter Property="Foreground" Value="#DDAA44"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
         </StackPanel>
 
     </StackPanel>
+    </ScrollViewer>
 </Window>

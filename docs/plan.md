@@ -380,8 +380,11 @@ There are **4 manual playlist switches** during a game. Each is a quick tap in t
 - [x] Color-coded button state visuals (amber=DIM, blue=FADE OUT, red=KILL, green=playing)
 - [x] State machine: DIM → FADE OUT transitions correctly, KILL clears all states
 
-### Phase 5: Polish
-- [ ] Settings persistence (JSON)
-- [ ] Error handling (missing files, Spotify not running)
-- [ ] Pre-game checklist screen or verification
-- [ ] Final touch/UX pass — button sizing, spacing, visual feedback
+### Phase 5: Polish ✅
+- [x] Settings persistence (JSON to %APPDATA%\StadiumPA\settings.json)
+- [x] Error handling (missing files, load failures, graceful defaults)
+- [x] Pre-game checklist (anthem/goal loaded, Spotify detected, volume OK)
+- [x] Configurable dim level slider and fade duration slider in settings
+- [x] Dynamic DIM button subtitle reflects current dim level
+- [x] ScrollViewer for safe overflow on smaller screens
+- [x] Settings saved on change and on app close
