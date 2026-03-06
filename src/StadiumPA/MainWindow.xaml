@@ -88,7 +88,6 @@
 
         <!-- Large action button with green glow when playing -->
         <Style x:Key="PlayingActionButton" TargetType="Button" BasedOn="{StaticResource LargeActionButton}">
-            <Setter Property="MinHeight" Value="90"/>
             <Setter Property="Background" Value="#333333"/>
             <Setter Property="BorderBrush" Value="#555555"/>
             <Setter Property="BorderThickness" Value="3"/>

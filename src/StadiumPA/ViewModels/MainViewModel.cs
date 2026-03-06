@@ -34,7 +34,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     // Audio control state machine (Phase 4)
     private AudioControlState _audioState = AudioControlState.Normal;
-    private float _savedSpotifyVol = 0.80f;
+    private float _savedSpotifyVol;
     private float _savedAnthemVol = 1.0f;
     private float _savedGoalVol = 1.0f;
     private bool _spotifyWasPausedByUs;
@@ -53,6 +53,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _dimLevel = _settings.DimLevel;
         _fadeDurationMs = _settings.FadeDurationMs;
         _alwaysOnTop = _settings.AlwaysOnTop;
+        _savedSpotifyVol = _settings.DefaultSpotifyVolume;
 
         _masterVolume = new MasterVolumeService();
         _sleepSuppression = new SleepSuppressionService();
@@ -124,6 +125,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             {
                 _masterVolume.Volume = _masterVolumeLevel;
                 OnPropertyChanged(nameof(MasterVolumePercent));
+                RefreshChecklist();
             }
         }
     }
