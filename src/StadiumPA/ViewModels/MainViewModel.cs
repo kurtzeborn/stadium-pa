@@ -6,26 +6,27 @@ using StadiumPA.Services;
 namespace StadiumPA.ViewModels;
 
 /// <summary>
-/// Main view model for Phase 1: master volume, mute toggle, always-on-top toggle.
-/// Placeholder properties for Spotify controls, audio buttons, etc. are included
-/// so the UI can bind to them (they are non-functional stubs until later phases).
+/// Main view model — Phase 1 + Phase 2: master volume, mute, always-on-top,
+/// Spotify media key control, Spotify per-process volume, keyboard shortcuts.
 /// </summary>
 public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly MasterVolumeService _masterVolume;
     private readonly SleepSuppressionService _sleepSuppression;
+    private readonly SpotifyVolumeService _spotifyVolume;
 
     private float _masterVolumeLevel;
     private bool _isMuted;
     private bool _alwaysOnTop = true;
 
-    // Placeholder values for future phases
-    private float _spotifyVolume = 0.80f;
+    private float _spotifyVolumeLevel = 0.80f;
+    private bool _isSpotifyRunning;
 
     public MainViewModel()
     {
         _masterVolume = new MasterVolumeService();
         _sleepSuppression = new SleepSuppressionService();
+        _spotifyVolume = new SpotifyVolumeService();
 
         // Enable sleep suppression on startup
         _sleepSuppression.Enable();
@@ -34,20 +35,31 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _masterVolumeLevel = _masterVolume.Volume;
         _isMuted = _masterVolume.IsMuted;
 
+        // Read Spotify state
+        _isSpotifyRunning = _spotifyVolume.IsSpotifyRunning;
+        if (_isSpotifyRunning)
+        {
+            _spotifyVolumeLevel = _spotifyVolume.Volume ?? 0.80f;
+        }
+
         // Commands
         ToggleMuteCommand = new RelayCommand(ToggleMute);
         ToggleAlwaysOnTopCommand = new RelayCommand(ToggleAlwaysOnTop);
 
-        // Placeholder commands (non-functional stubs for Phase 1)
-        SpotifyPrevCommand = new RelayCommand(() => { });
-        SpotifyPlayPauseCommand = new RelayCommand(() => { });
-        SpotifyNextCommand = new RelayCommand(() => { });
+        // Spotify commands
+        SpotifyPrevCommand = new RelayCommand(MediaKeyService.PreviousTrack);
+        SpotifyPlayPauseCommand = new RelayCommand(MediaKeyService.PlayPause);
+        SpotifyNextCommand = new RelayCommand(MediaKeyService.NextTrack);
+
+        // Timeout = next track (same media key)
+        TimeoutNextSongCommand = new RelayCommand(MediaKeyService.NextTrack);
+
+        // Placeholder commands (non-functional stubs until later phases)
         DimCommand = new RelayCommand(() => { });
         FadeOutCommand = new RelayCommand(() => { });
         KillCommand = new RelayCommand(() => { });
         AnthemCommand = new RelayCommand(() => { });
         GoalCommand = new RelayCommand(() => { });
-        TimeoutNextSongCommand = new RelayCommand(() => { });
     }
 
     #region Master Volume
@@ -99,25 +111,54 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     #endregion
 
-    #region Spotify (Placeholder — Phase 2)
+    #region Spotify (Phase 2)
+
+    /// <summary>
+    /// Whether Spotify is currently running. Updated on startup; UI can poll or refresh.
+    /// </summary>
+    public bool IsSpotifyRunning
+    {
+        get => _isSpotifyRunning;
+        private set => SetField(ref _isSpotifyRunning, value);
+    }
 
     public float SpotifyVolume
     {
-        get => _spotifyVolume;
+        get => _spotifyVolumeLevel;
         set
         {
-            if (SetField(ref _spotifyVolume, Math.Clamp(value, 0f, 1f)))
+            if (SetField(ref _spotifyVolumeLevel, Math.Clamp(value, 0f, 1f)))
             {
+                _spotifyVolume.Volume = _spotifyVolumeLevel;
                 OnPropertyChanged(nameof(SpotifyVolumePercent));
             }
         }
     }
 
-    public string SpotifyVolumePercent => $"{(int)(_spotifyVolume * 100)}%";
+    public string SpotifyVolumePercent => $"{(int)(_spotifyVolumeLevel * 100)}%";
 
     public ICommand SpotifyPrevCommand { get; }
     public ICommand SpotifyPlayPauseCommand { get; }
     public ICommand SpotifyNextCommand { get; }
+
+    /// <summary>
+    /// Re-checks whether Spotify is running and syncs the volume slider.
+    /// Called from code-behind on window activation or a timer.
+    /// </summary>
+    public void RefreshSpotifyState()
+    {
+        IsSpotifyRunning = _spotifyVolume.IsSpotifyRunning;
+        if (_isSpotifyRunning)
+        {
+            var current = _spotifyVolume.Volume;
+            if (current.HasValue)
+            {
+                _spotifyVolumeLevel = current.Value;
+                OnPropertyChanged(nameof(SpotifyVolume));
+                OnPropertyChanged(nameof(SpotifyVolumePercent));
+            }
+        }
+    }
 
     #endregion
 
@@ -133,6 +174,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public ICommand AnthemCommand { get; }
     public ICommand GoalCommand { get; }
+
+    #endregion
+
+    #region Timeout (Phase 2 — uses media key next track)
+
     public ICommand TimeoutNextSongCommand { get; }
 
     #endregion
@@ -157,6 +203,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public void Dispose()
     {
         _sleepSuppression.Dispose();
+        _spotifyVolume.Dispose();
         _masterVolume.Dispose();
     }
 }

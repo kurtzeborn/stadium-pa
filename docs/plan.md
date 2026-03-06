@@ -358,11 +358,11 @@ There are **4 manual playlist switches** during a game. Each is a quick tap in t
 - [x] Always-on-top window (default on, toggle)
 - [x] Sleep/screen suppression (`SetThreadExecutionState`)
 
-### Phase 2: Spotify Control
-- [ ] Media key simulation (play/pause/next/prev)
-- [ ] Spotify per-process volume slider
-- [ ] Spotify process detection
-- [ ] Keyboard shortcuts for core controls (KILL as global hotkey)
+### Phase 2: Spotify Control ✅
+- [x] Media key simulation (play/pause/next/prev)
+- [x] Spotify per-process volume slider
+- [x] Spotify process detection
+- [x] Keyboard shortcuts for core controls (KILL as global hotkey)
 
 ### Phase 3: Local Audio Playback
 - [ ] NAudio playback engine for local files

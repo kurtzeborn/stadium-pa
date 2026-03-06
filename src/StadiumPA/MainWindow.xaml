@@ -179,7 +179,7 @@
             <Button Style="{StaticResource ToggleIconButton}"
                     Command="{Binding ToggleMuteCommand}"
                     Content="{Binding IsMuted, Converter={x:Static converters:BoolToMuteConverter.Instance}}"
-                    DockPanel.Dock="Right" Width="60"/>
+                    DockPanel.Dock="Right" Width="60" ToolTip="Ctrl+M"/>
             <Slider Style="{StaticResource DarkSlider}"
                     Value="{Binding MasterVolumeLevel, Mode=TwoWay}"
                     SmallChange="0.01" LargeChange="0.05"/>
@@ -203,7 +203,7 @@
                     <TextBlock Text="↓0% + stop (toggle)" FontSize="11" HorizontalAlignment="Center" Foreground="#4488CC"/>
                 </StackPanel>
             </Button>
-            <Button Style="{StaticResource KillButton}" IsEnabled="False" ToolTip="Phase 4"
+            <Button Style="{StaticResource KillButton}" IsEnabled="False" ToolTip="Phase 4 (Esc)"
                     Command="{Binding KillCommand}">
                 <StackPanel>
                     <TextBlock Text="⚠ KILL" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#FF6666"/>
@@ -222,16 +222,15 @@
                        DockPanel.Dock="Right" Margin="8,0,0,0"/>
             <Slider Style="{StaticResource DarkSlider}"
                     Value="{Binding SpotifyVolume, Mode=TwoWay}"
-                    SmallChange="0.01" LargeChange="0.05"
-                    IsEnabled="False" ToolTip="Coming in Phase 2"/>
+                    SmallChange="0.01" LargeChange="0.05"/>
         </DockPanel>
         <UniformGrid Columns="3" Margin="8,0,8,8">
             <Button Style="{StaticResource TouchButton}" Content="⏮ PREV"
-                    Command="{Binding SpotifyPrevCommand}" IsEnabled="False" ToolTip="Phase 2"/>
+                    Command="{Binding SpotifyPrevCommand}" ToolTip="Ctrl+Left"/>
             <Button Style="{StaticResource TouchButton}" Content="⏯ PLAY / PAUSE"
-                    Command="{Binding SpotifyPlayPauseCommand}" IsEnabled="False" ToolTip="Phase 2"/>
+                    Command="{Binding SpotifyPlayPauseCommand}" ToolTip="Space"/>
             <Button Style="{StaticResource TouchButton}" Content="⏭ NEXT"
-                    Command="{Binding SpotifyNextCommand}" IsEnabled="False" ToolTip="Phase 2"/>
+                    Command="{Binding SpotifyNextCommand}" ToolTip="Ctrl+Right"/>
         </UniformGrid>
 
         <Separator Background="#444444" Margin="8,2"/>
@@ -258,8 +257,8 @@
 
         <!-- ═══ TIMEOUT ═══ -->
         <Button Style="{StaticResource LargeActionButton}" Margin="8,0,8,12"
-                IsEnabled="False" ToolTip="Phase 2"
                 Command="{Binding TimeoutNextSongCommand}"
+                ToolTip="Ctrl+T"
                 HorizontalContentAlignment="Center">
             <TextBlock Text="⏱ TIMEOUT — NEXT SONG" FontSize="18" FontWeight="Bold"/>
         </Button>
