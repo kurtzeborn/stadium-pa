@@ -9,14 +9,20 @@ namespace StadiumPA.Services;
 /// </summary>
 public sealed class VolumeFader : IDisposable
 {
-    private DispatcherTimer? _timer;
+    private readonly DispatcherTimer _timer;
     private int _totalSteps;
     private int _currentStep;
     private Action<float>? _onProgress;
     private Action? _onComplete;
 
+    public VolumeFader()
+    {
+        _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+        _timer.Tick += OnTick;
+    }
+
     /// <summary>Whether a fade is currently in progress.</summary>
-    public bool IsFading => _timer?.IsEnabled == true;
+    public bool IsFading => _timer.IsEnabled;
 
     /// <summary>
     /// Starts a fade, calling <paramref name="onProgress"/> with a value from 0.0 to 1.0
@@ -34,20 +40,15 @@ public sealed class VolumeFader : IDisposable
         _totalSteps = Math.Max(1, durationMs / stepMs);
         _currentStep = 0;
 
-        _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(stepMs) };
-        _timer.Tick += OnTick;
         _timer.Start();
     }
 
     /// <summary>Cancels any in-progress fade immediately.</summary>
     public void Cancel()
     {
-        if (_timer is not null)
-        {
-            _timer.Stop();
-            _timer.Tick -= OnTick;
-            _timer = null;
-        }
+        _timer.Stop();
+        _onProgress = null;
+        _onComplete = null;
     }
 
     private void OnTick(object? sender, EventArgs e)
@@ -64,5 +65,9 @@ public sealed class VolumeFader : IDisposable
         }
     }
 
-    public void Dispose() => Cancel();
+    public void Dispose()
+    {
+        Cancel();
+        _timer.Tick -= OnTick;
+    }
 }

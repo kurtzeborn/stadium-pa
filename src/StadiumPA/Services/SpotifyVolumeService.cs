@@ -13,6 +13,11 @@ public sealed class SpotifyVolumeService : IDisposable
     private readonly MMDeviceEnumerator _enumerator;
     private readonly MMDevice _device;
 
+    // Cached session avoids repeated Process.GetProcessesByName + session
+    // enumeration on every call — critical during fades (~20 calls/sec).
+    private AudioSessionControl? _cachedSession;
+    private uint _cachedSessionPid;
+
     public SpotifyVolumeService()
     {
         _enumerator = new MMDeviceEnumerator();
@@ -72,11 +77,27 @@ public sealed class SpotifyVolumeService : IDisposable
 
     /// <summary>
     /// Finds the audio session belonging to Spotify by matching process ID.
-    /// Gets the Spotify PID first, then scans sessions — avoids creating
-    /// a Process object for every audio session.
+    /// Caches the result to avoid expensive Process.GetProcessesByName and
+    /// session enumeration on every call. Cache is validated by checking
+    /// the stored PID via a lightweight COM property get.
     /// </summary>
     private AudioSessionControl? GetSpotifySession()
     {
+        // Try cached session first (single COM property get vs full enumeration)
+        if (_cachedSession is not null)
+        {
+            try
+            {
+                if (_cachedSession.GetProcessID == _cachedSessionPid)
+                    return _cachedSession;
+            }
+            catch
+            {
+                // COM object went stale (Spotify exited)
+            }
+            _cachedSession = null;
+        }
+
         var spotifyPid = FindSpotifyProcessId();
         if (spotifyPid is null) return null;
 
@@ -86,6 +107,8 @@ public sealed class SpotifyVolumeService : IDisposable
             var session = sessions[i];
             if (session.GetProcessID == spotifyPid.Value)
             {
+                _cachedSession = session;
+                _cachedSessionPid = spotifyPid.Value;
                 return session;
             }
         }
