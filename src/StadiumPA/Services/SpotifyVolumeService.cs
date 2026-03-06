@@ -27,7 +27,7 @@ public sealed class SpotifyVolumeService : IDisposable
     /// <summary>
     /// Returns true if a Spotify process is currently running.
     /// </summary>
-    public bool IsSpotifyRunning => FindSpotifyProcessId() is not null;
+    public bool IsSpotifyRunning => FindSpotifyProcessIds().Count > 0;
 
     /// <summary>
     /// Returns true if Spotify is actively producing audio (session state is Active).
@@ -60,14 +60,18 @@ public sealed class SpotifyVolumeService : IDisposable
     }
 
     /// <summary>
-    /// Finds the Spotify process ID, or null if not running.
+    /// Returns the set of all Spotify process IDs (Spotify is Electron-based
+    /// and spawns multiple processes — the audio session can belong to any of them).
     /// </summary>
-    private static uint? FindSpotifyProcessId()
+    private static HashSet<uint> FindSpotifyProcessIds()
     {
         var processes = Process.GetProcessesByName("Spotify");
         try
         {
-            return processes.Length > 0 ? (uint)processes[0].Id : null;
+            var pids = new HashSet<uint>(processes.Length);
+            foreach (var p in processes)
+                pids.Add((uint)p.Id);
+            return pids;
         }
         finally
         {
@@ -98,17 +102,17 @@ public sealed class SpotifyVolumeService : IDisposable
             _cachedSession = null;
         }
 
-        var spotifyPid = FindSpotifyProcessId();
-        if (spotifyPid is null) return null;
+        var spotifyPids = FindSpotifyProcessIds();
+        if (spotifyPids.Count == 0) return null;
 
         var sessions = _device.AudioSessionManager.Sessions;
         for (int i = 0; i < sessions.Count; i++)
         {
             var session = sessions[i];
-            if (session.GetProcessID == spotifyPid.Value)
+            if (spotifyPids.Contains(session.GetProcessID))
             {
                 _cachedSession = session;
-                _cachedSessionPid = spotifyPid.Value;
+                _cachedSessionPid = session.GetProcessID;
                 return session;
             }
         }
