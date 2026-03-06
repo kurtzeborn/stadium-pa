@@ -95,17 +95,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         ToggleMuteCommand = new RelayCommand(ToggleMute);
         ToggleAlwaysOnTopCommand = new RelayCommand(ToggleAlwaysOnTop);
 
-        // Spotify commands (reset fade state on any transport action)
-        SpotifyPrevCommand = new RelayCommand(() => { ResetToNormalState(); MediaKeyService.PreviousTrack(); });
-        SpotifyPlayPauseCommand = new RelayCommand(() => { ResetToNormalState(); MediaKeyService.PlayPause(); });
-        SpotifyNextCommand = new RelayCommand(() => { ResetToNormalState(); MediaKeyService.NextTrack(); });
+        // Spotify commands (reset fade state + resume Spotify on any transport action)
+        SpotifyPrevCommand = new RelayCommand(() => { ResetToNormalState(resumeSpotify: true); MediaKeyService.PreviousTrack(); });
+        SpotifyPlayPauseCommand = new RelayCommand(() => { ResetToNormalState(resumeSpotify: true); MediaKeyService.PlayPause(); });
+        SpotifyNextCommand = new RelayCommand(() => { ResetToNormalState(resumeSpotify: true); MediaKeyService.NextTrack(); });
 
         // Timeout = next track (same media key)
-        TimeoutNextSongCommand = new RelayCommand(() => { ResetToNormalState(); MediaKeyService.NextTrack(); });
+        TimeoutNextSongCommand = new RelayCommand(() => { ResetToNormalState(resumeSpotify: true); MediaKeyService.NextTrack(); });
 
-        // Local audio commands (reset fade state + ensure full volume before playing)
-        AnthemCommand = new RelayCommand(() => { ResetToNormalState(); _anthemPlayer.Volume = 1.0f; _anthemPlayer.TogglePlayback(); }, () => _anthemPlayer.IsLoaded);
-        GoalCommand = new RelayCommand(() => { ResetToNormalState(); _goalPlayer.Volume = 1.0f; _goalPlayer.TogglePlayback(); }, () => _goalPlayer.IsLoaded);
+        // Local audio commands (reset fade state but DON'T resume Spotify — the
+        // goal horn / anthem should play on its own without bringing Spotify back)
+        AnthemCommand = new RelayCommand(() => { ResetToNormalState(resumeSpotify: false); _anthemPlayer.Volume = 1.0f; _anthemPlayer.TogglePlayback(); }, () => _anthemPlayer.IsLoaded);
+        GoalCommand = new RelayCommand(() => { ResetToNormalState(resumeSpotify: false); _goalPlayer.Volume = 1.0f; _goalPlayer.TogglePlayback(); }, () => _goalPlayer.IsLoaded);
         BrowseAnthemFileCommand = new RelayCommand(BrowseAnthemFile);
         BrowseGoalFileCommand = new RelayCommand(BrowseGoalFile);
 
@@ -309,11 +310,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     /// <summary>
     /// If audio is in any non-Normal state (Dimmed, FadedOut, Killed),
-    /// cancels active fades, restores saved volumes, resumes paused audio,
-    /// and returns to Normal. Called before any manual play/transport command
-    /// so the operator can start fresh.
+    /// cancels active fades, restores saved volumes, and returns to Normal.
+    /// <paramref name="resumeSpotify"/>: when true, also resumes any audio
+    /// we paused (used by Spotify transport/Timeout buttons). When false,
+    /// only restores volumes without resuming Spotify (used by Goal/Anthem
+    /// so the celebration plays alone without bringing Spotify back).
     /// </summary>
-    private void ResetToNormalState()
+    private void ResetToNormalState(bool resumeSpotify)
     {
         if (_audioState == AudioControlState.Normal) return;
 
@@ -327,8 +330,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _anthemPlayer.Volume = _savedAnthemVol;
         _goalPlayer.Volume = _savedGoalVol;
 
-        // Resume anything we paused (FadedOut state)
-        ResumeActiveAudio();
+        if (resumeSpotify)
+        {
+            // Resume anything we paused (FadedOut state)
+            ResumeActiveAudio();
+        }
+        else
+        {
+            // Clear the paused-by-us flags without actually resuming
+            _spotifyWasPausedByUs = false;
+            _anthemWasPausedByUs = false;
+            _goalWasPausedByUs = false;
+        }
 
         SetAudioState(AudioControlState.Normal);
     }
