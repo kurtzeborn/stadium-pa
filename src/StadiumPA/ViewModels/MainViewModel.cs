@@ -31,7 +31,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     // Audio control state machine (Phase 4)
     private AudioControlState _audioState = AudioControlState.Normal;
-    private float _savedSpotifyVol;
+    private float _savedSpotifyVol = 0.80f;
     private float _savedAnthemVol = 1.0f;
     private float _savedGoalVol = 1.0f;
     private bool _spotifyWasPausedByUs;
@@ -226,6 +226,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _savedGoalVol = _goalPlayer.Volume;
     }
 
+    /// <summary>
+    /// Sets volume on all active audio sources directly (bypassing the SpotifyVolume
+    /// property setter intentionally — the slider should show the target volume,
+    /// not transient fade values).
+    /// </summary>
     private void SetAllActiveVolumes(float spotifyVol, float anthemVol, float goalVol)
     {
         _spotifyVolume.Volume = spotifyVol;
@@ -278,6 +283,40 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private static float Lerp(float a, float b, float t) => a + (b - a) * t;
 
+    /// <summary>
+    /// Captures current volume levels from all sources and fades to target.
+    /// </summary>
+    private void FadeToLevel(float targetLevel, Action? onComplete = null)
+    {
+        var fromS = _spotifyVolume.Volume ?? _savedSpotifyVol;
+        var fromA = _anthemPlayer.Volume;
+        var fromG = _goalPlayer.Volume;
+        _fader.Start(FadeDurationMs, t =>
+        {
+            SetAllActiveVolumes(
+                Lerp(fromS, targetLevel, t),
+                Lerp(fromA, targetLevel, t),
+                Lerp(fromG, targetLevel, t));
+        }, onComplete);
+    }
+
+    /// <summary>
+    /// Fades from current levels back to the previously saved volumes.
+    /// </summary>
+    private void FadeToSavedLevels()
+    {
+        var fromS = _spotifyVolume.Volume ?? 0f;
+        var fromA = _anthemPlayer.Volume;
+        var fromG = _goalPlayer.Volume;
+        _fader.Start(FadeDurationMs, t =>
+        {
+            SetAllActiveVolumes(
+                Lerp(fromS, _savedSpotifyVol, t),
+                Lerp(fromA, _savedAnthemVol, t),
+                Lerp(fromG, _savedGoalVol, t));
+        });
+    }
+
     private void ExecuteDim()
     {
         _fader.Cancel();
@@ -285,37 +324,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         switch (_audioState)
         {
             case AudioControlState.Normal:
-            {
                 SaveActiveVolumes();
-                var fromS = _spotifyVolume.Volume ?? _savedSpotifyVol;
-                var fromA = _anthemPlayer.Volume;
-                var fromG = _goalPlayer.Volume;
                 SetAudioState(AudioControlState.Dimmed);
-                _fader.Start(FadeDurationMs, t =>
-                {
-                    SetAllActiveVolumes(
-                        Lerp(fromS, DimLevel, t),
-                        Lerp(fromA, DimLevel, t),
-                        Lerp(fromG, DimLevel, t));
-                });
+                FadeToLevel(DimLevel);
                 break;
-            }
 
             case AudioControlState.Dimmed:
-            {
-                var curS = _spotifyVolume.Volume ?? DimLevel;
-                var curA = _anthemPlayer.Volume;
-                var curG = _goalPlayer.Volume;
                 SetAudioState(AudioControlState.Normal);
-                _fader.Start(FadeDurationMs, t =>
-                {
-                    SetAllActiveVolumes(
-                        Lerp(curS, _savedSpotifyVol, t),
-                        Lerp(curA, _savedAnthemVol, t),
-                        Lerp(curG, _savedGoalVol, t));
-                });
+                FadeToSavedLevels();
                 break;
-            }
 
             default:
                 break; // FadedOut, Killed: no-op
@@ -329,51 +346,21 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         switch (_audioState)
         {
             case AudioControlState.Normal:
-            {
                 SaveActiveVolumes();
-                var fromS = _spotifyVolume.Volume ?? _savedSpotifyVol;
-                var fromA = _anthemPlayer.Volume;
-                var fromG = _goalPlayer.Volume;
                 SetAudioState(AudioControlState.FadedOut);
-                _fader.Start(FadeDurationMs, t =>
-                {
-                    SetAllActiveVolumes(
-                        Lerp(fromS, 0f, t),
-                        Lerp(fromA, 0f, t),
-                        Lerp(fromG, 0f, t));
-                }, PauseActiveAudio);
+                FadeToLevel(0f, PauseActiveAudio);
                 break;
-            }
 
             case AudioControlState.Dimmed:
-            {
-                var curS = _spotifyVolume.Volume ?? DimLevel;
-                var curA = _anthemPlayer.Volume;
-                var curG = _goalPlayer.Volume;
                 SetAudioState(AudioControlState.FadedOut);
-                _fader.Start(FadeDurationMs, t =>
-                {
-                    SetAllActiveVolumes(
-                        Lerp(curS, 0f, t),
-                        Lerp(curA, 0f, t),
-                        Lerp(curG, 0f, t));
-                }, PauseActiveAudio);
+                FadeToLevel(0f, PauseActiveAudio);
                 break;
-            }
 
             case AudioControlState.FadedOut:
-            {
                 ResumeActiveAudio();
                 SetAudioState(AudioControlState.Normal);
-                _fader.Start(FadeDurationMs, t =>
-                {
-                    SetAllActiveVolumes(
-                        Lerp(0f, _savedSpotifyVol, t),
-                        Lerp(0f, _savedAnthemVol, t),
-                        Lerp(0f, _savedGoalVol, t));
-                });
+                FadeToSavedLevels();
                 break;
-            }
 
             default:
                 break; // Killed: no-op
@@ -385,7 +372,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _fader.Cancel();
         if (_audioState == AudioControlState.Killed) return;
 
-        // Save volumes if coming directly from Normal
+        // Dimmed/FadedOut states already saved volumes on entry;
+        // only need to capture if coming directly from Normal.
         if (_audioState == AudioControlState.Normal)
             SaveActiveVolumes();
 
@@ -546,15 +534,4 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _spotifyVolume.Dispose();
         _masterVolume.Dispose();
     }
-}
-
-/// <summary>
-/// State machine for the DIM / FADE OUT / KILL audio controls.
-/// </summary>
-public enum AudioControlState
-{
-    Normal,
-    Dimmed,
-    FadedOut,
-    Killed
 }

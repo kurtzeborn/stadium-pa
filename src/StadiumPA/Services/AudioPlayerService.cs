@@ -10,7 +10,7 @@ namespace StadiumPA.Services;
 /// </summary>
 public sealed class AudioPlayerService : IDisposable
 {
-    private MemoryStream? _audioData;
+    private byte[]? _audioData;
     private WaveStream? _reader;
     private WaveOutEvent? _waveOut;
     private string? _filePath;
@@ -78,11 +78,10 @@ public sealed class AudioPlayerService : IDisposable
         DisposePlayback();
 
         _filePath = filePath;
-        var fileBytes = File.ReadAllBytes(filePath);
-        _audioData = new MemoryStream(fileBytes);
+        _audioData = File.ReadAllBytes(filePath);
 
         // Create reader to get TotalTime — will be recreated on each Play()
-        _reader = CreateReader(new MemoryStream(fileBytes));
+        _reader = CreateReader(new MemoryStream(_audioData));
     }
 
     /// <summary>
@@ -111,8 +110,7 @@ public sealed class AudioPlayerService : IDisposable
         DisposePlayback();
 
         // Create a fresh stream + reader from the pre-loaded bytes
-        var stream = new MemoryStream(_audioData.ToArray());
-        _reader = CreateReader(stream);
+        _reader = CreateReader(new MemoryStream(_audioData));
 
         _waveOut = new WaveOutEvent();
         _waveOut.Init(_reader);
@@ -194,7 +192,6 @@ public sealed class AudioPlayerService : IDisposable
     public void Dispose()
     {
         DisposePlayback();
-        _audioData?.Dispose();
         _audioData = null;
     }
 }

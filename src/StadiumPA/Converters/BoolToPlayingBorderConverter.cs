@@ -10,8 +10,6 @@ namespace StadiumPA.Converters;
 /// </summary>
 public sealed class BoolToPlayingBorderConverter : IValueConverter
 {
-    public static readonly BoolToPlayingBorderConverter Instance = new();
-
     private static readonly Color PlayingColor = (Color)ColorConverter.ConvertFromString("#44CC44");
     private static readonly Color IdleColor = (Color)ColorConverter.ConvertFromString("#555555");
 
