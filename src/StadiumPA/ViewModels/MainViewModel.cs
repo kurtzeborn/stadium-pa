@@ -45,6 +45,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private float _dimLevel;
     private int _fadeDurationMs;
     private string? _statusMessage;
+    private bool _isAltHeld;
 
     public MainViewModel()
     {
@@ -685,6 +686,19 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         OnPropertyChanged(nameof(GoalStatusText));
         OnPropertyChanged(nameof(SpotifyStatusText));
         OnPropertyChanged(nameof(VolumeStatusText));
+    }
+
+    #endregion
+
+    #region Alt-Key Hotkey Hints
+
+    /// <summary>
+    /// True while the Alt key is held, used to show hotkey badge overlays.
+    /// </summary>
+    public bool IsAltHeld
+    {
+        get => _isAltHeld;
+        set => SetField(ref _isAltHeld, value);
     }
 
     #endregion

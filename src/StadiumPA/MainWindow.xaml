@@ -182,6 +182,24 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
+        <!-- Hotkey badge: small pill overlay shown while Alt is held -->
+        <Style x:Key="HotkeyBadge" TargetType="Border">
+            <Setter Property="Background" Value="#DD000000"/>
+            <Setter Property="BorderBrush" Value="#88FFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="5,1"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Margin" Value="0,-4,-4,0"/>
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsAltHeld}" Value="True">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -208,8 +226,15 @@
                        DockPanel.Dock="Right" Margin="8,0,0,0"/>
             <Button Style="{StaticResource ToggleIconButton}"
                     Command="{Binding ToggleMuteCommand}"
-                    Content="{Binding IsMuted, Converter={x:Static converters:BoolToMuteConverter.Instance}}"
-                    DockPanel.Dock="Right" Width="60" ToolTip="Ctrl+M"/>
+                    DockPanel.Dock="Right" Width="60" ToolTip="Ctrl+M">
+                <Grid>
+                    <ContentPresenter Content="{Binding IsMuted, Converter={x:Static converters:BoolToMuteConverter.Instance}}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Border Style="{StaticResource HotkeyBadge}">
+                        <TextBlock Text="Ctrl+M" FontSize="10" Foreground="White" FontWeight="Bold"/>
+                    </Border>
+                </Grid>
+            </Button>
             <Slider Style="{StaticResource DarkSlider}"
                     Value="{Binding MasterVolumeLevel, Mode=TwoWay}"
                     SmallChange="0.01" LargeChange="0.05"/>
@@ -235,10 +260,15 @@
             </Button>
             <Button Style="{StaticResource KillButton}"
                     Command="{Binding KillCommand}" ToolTip="Esc">
-                <StackPanel>
-                    <TextBlock Text="⚠ KILL" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#FF6666"/>
-                    <TextBlock Text="instant off" FontSize="11" HorizontalAlignment="Center" Foreground="#CC4444"/>
-                </StackPanel>
+                <Grid>
+                    <StackPanel>
+                        <TextBlock Text="⚠ KILL" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#FF6666"/>
+                        <TextBlock Text="instant off" FontSize="11" HorizontalAlignment="Center" Foreground="#CC4444"/>
+                    </StackPanel>
+                    <Border Style="{StaticResource HotkeyBadge}">
+                        <TextBlock Text="Esc" FontSize="10" Foreground="White" FontWeight="Bold"/>
+                    </Border>
+                </Grid>
             </Button>
         </UniformGrid>
 
@@ -255,12 +285,33 @@
                     SmallChange="0.01" LargeChange="0.05"/>
         </DockPanel>
         <UniformGrid Columns="3" Margin="8,0,8,8">
-            <Button Style="{StaticResource TouchButton}" Content="⏮ PREV"
-                    Command="{Binding SpotifyPrevCommand}" ToolTip="Ctrl+Left"/>
-            <Button Style="{StaticResource TouchButton}" Content="⏯ PLAY / PAUSE"
-                    Command="{Binding SpotifyPlayPauseCommand}" ToolTip="Ctrl+Space"/>
-            <Button Style="{StaticResource TouchButton}" Content="⏭ NEXT"
-                    Command="{Binding SpotifyNextCommand}" ToolTip="Ctrl+Right"/>
+            <Button Style="{StaticResource TouchButton}" ToolTip="Ctrl+Left"
+                    Command="{Binding SpotifyPrevCommand}">
+                <Grid>
+                    <TextBlock Text="⏮ PREV" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Border Style="{StaticResource HotkeyBadge}">
+                        <TextBlock Text="Ctrl+←" FontSize="10" Foreground="White" FontWeight="Bold"/>
+                    </Border>
+                </Grid>
+            </Button>
+            <Button Style="{StaticResource TouchButton}" ToolTip="Ctrl+Space"
+                    Command="{Binding SpotifyPlayPauseCommand}">
+                <Grid>
+                    <TextBlock Text="⏯ PLAY / PAUSE" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Border Style="{StaticResource HotkeyBadge}">
+                        <TextBlock Text="Ctrl+Space" FontSize="10" Foreground="White" FontWeight="Bold"/>
+                    </Border>
+                </Grid>
+            </Button>
+            <Button Style="{StaticResource TouchButton}" ToolTip="Ctrl+Right"
+                    Command="{Binding SpotifyNextCommand}">
+                <Grid>
+                    <TextBlock Text="⏭ NEXT" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <Border Style="{StaticResource HotkeyBadge}">
+                        <TextBlock Text="Ctrl+→" FontSize="10" Foreground="White" FontWeight="Bold"/>
+                    </Border>
+                </Grid>
+            </Button>
         </UniformGrid>
 
         <Separator Background="#444444" Margin="8,2"/>
@@ -296,7 +347,13 @@
                 Command="{Binding TimeoutNextSongCommand}"
                 ToolTip="Ctrl+T"
                 HorizontalContentAlignment="Center">
-            <TextBlock Text="⏱ TIMEOUT — NEXT SONG" FontSize="18" FontWeight="Bold"/>
+            <Grid>
+                <TextBlock Text="⏱ TIMEOUT — NEXT SONG" FontSize="18" FontWeight="Bold"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Border Style="{StaticResource HotkeyBadge}">
+                    <TextBlock Text="Ctrl+T" FontSize="10" Foreground="White" FontWeight="Bold"/>
+                </Border>
+            </Grid>
         </Button>
 
         <!-- Settings -->

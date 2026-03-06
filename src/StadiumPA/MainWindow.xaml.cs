@@ -24,6 +24,11 @@ public partial class MainWindow : Window
         InputBindings.Add(new KeyBinding(_viewModel.ToggleMuteCommand, Key.M, ModifierKeys.Control));
         InputBindings.Add(new KeyBinding(_viewModel.TimeoutNextSongCommand, Key.T, ModifierKeys.Control));
         InputBindings.Add(new KeyBinding(_viewModel.KillCommand, Key.Escape, ModifierKeys.None));
+
+        // Alt-key hotkey hint overlay
+        PreviewKeyDown += (_, e) => { if (e.Key == Key.LeftAlt || e.Key == Key.RightAlt || e.SystemKey == Key.LeftAlt || e.SystemKey == Key.RightAlt) _viewModel.IsAltHeld = true; };
+        PreviewKeyUp += (_, e) => { if (e.Key == Key.LeftAlt || e.Key == Key.RightAlt || e.SystemKey == Key.LeftAlt || e.SystemKey == Key.RightAlt) _viewModel.IsAltHeld = false; };
+        Deactivated += (_, _) => _viewModel.IsAltHeld = false;
     }
 
     protected override void OnActivated(EventArgs e)
