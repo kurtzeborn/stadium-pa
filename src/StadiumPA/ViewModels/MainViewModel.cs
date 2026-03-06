@@ -252,15 +252,20 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     }
 
     /// <summary>
-    /// Sets volume on all active audio sources directly (bypassing the SpotifyVolume
-    /// property setter intentionally — the slider should show the target volume,
-    /// not transient fade values).
+    /// Sets volume on all active audio sources directly, updating the Spotify
+    /// slider to reflect the current fade position without re-applying the
+    /// volume through the property setter (which would be redundant).
     /// </summary>
     private void SetAllActiveVolumes(float spotifyVol, float anthemVol, float goalVol)
     {
         _spotifyVolume.Volume = spotifyVol;
         _anthemPlayer.Volume = anthemVol;
         _goalPlayer.Volume = goalVol;
+
+        // Keep the slider in sync so the user sees real-time fade progress
+        _spotifyVolumeLevel = spotifyVol;
+        OnPropertyChanged(nameof(SpotifyVolume));
+        OnPropertyChanged(nameof(SpotifyVolumePercent));
     }
 
     private void PauseActiveAudio()
