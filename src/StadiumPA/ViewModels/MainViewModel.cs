@@ -220,6 +220,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         RefreshChecklist();
     }
 
+    /// <summary>
+    /// Diagnostic: dumps audio session info for Spotify troubleshooting.
+    /// </summary>
+    public void DumpSpotifyDiagnostics()
+    {
+        var diag = _spotifyVolume.GetDiagnostics();
+        System.Windows.MessageBox.Show(diag, "Spotify Audio Diagnostics", System.Windows.MessageBoxButton.OK);
+    }
+
     #endregion
 
     #region Audio Control Buttons (Phase 4)

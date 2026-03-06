@@ -29,6 +29,9 @@ public partial class MainWindow : Window
         PreviewKeyDown += (_, e) => { if (e.Key == Key.LeftAlt || e.Key == Key.RightAlt || e.SystemKey == Key.LeftAlt || e.SystemKey == Key.RightAlt) _viewModel.IsAltHeld = true; };
         PreviewKeyUp += (_, e) => { if (e.Key == Key.LeftAlt || e.Key == Key.RightAlt || e.SystemKey == Key.LeftAlt || e.SystemKey == Key.RightAlt) _viewModel.IsAltHeld = false; };
         Deactivated += (_, _) => _viewModel.IsAltHeld = false;
+
+        // Temporary diagnostic: Ctrl+D dumps Spotify audio session info
+        PreviewKeyDown += (_, e) => { if (e.Key == Key.D && Keyboard.Modifiers == ModifierKeys.Control) _viewModel.DumpSpotifyDiagnostics(); };
     }
 
     protected override void OnActivated(EventArgs e)
