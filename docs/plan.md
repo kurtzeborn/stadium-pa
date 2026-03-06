@@ -261,16 +261,20 @@ stadium-pa/
 │       ├── App.xaml.cs
 │       ├── MainWindow.xaml
 │       ├── MainWindow.xaml.cs
+│       ├── Converters/
+│       │   └── BoolToMuteConverter.cs     # Bool → mute/unmute icon
 │       ├── Services/
-│       │   ├── AudioPlayerService.cs      # NAudio local file playback
+│       │   ├── AudioPlayerService.cs      # NAudio local file playback (Phase 3)
 │       │   ├── MasterVolumeService.cs     # System volume via Core Audio
-│       │   ├── SpotifyVolumeService.cs    # Per-process Spotify volume + ducking
-│       │   ├── MediaKeyService.cs         # Simulated media key presses
-│       │   └── VolumeFader.cs             # Smooth volume fade utility (duck/restore)
+│       │   ├── MediaKeyService.cs         # Simulated media key presses (Phase 2)
+│       │   ├── SleepSuppressionService.cs # Prevent sleep/screen off
+│       │   ├── SpotifyVolumeService.cs    # Per-process Spotify volume (Phase 2)
+│       │   └── VolumeFader.cs             # Smooth volume fade utility (Phase 4)
 │       ├── ViewModels/
-│       │   └── MainViewModel.cs           # MVVM bindings
+│       │   ├── MainViewModel.cs           # MVVM bindings
+│       │   └── RelayCommand.cs            # ICommand implementation
 │       └── Models/
-│           └── AppSettings.cs             # Persisted settings (file paths)
+│           └── AppSettings.cs             # Persisted settings (Phase 5)
 ├── .gitignore
 └── README.md
 ```
@@ -347,12 +351,12 @@ There are **4 manual playlist switches** during a game. Each is a quick tap in t
 
 ## Implementation Phases
 
-### Phase 1: Core Skeleton
-- [ ] Create WPF project (.NET 8)
-- [ ] Dark theme, touch-friendly layout with placeholder buttons
-- [ ] Master volume slider (Core Audio)
-- [ ] Always-on-top window (default on, toggle)
-- [ ] Sleep/screen suppression (`SetThreadExecutionState`)
+### Phase 1: Core Skeleton ✅
+- [x] Create WPF project (.NET 8)
+- [x] Dark theme, touch-friendly layout with placeholder buttons
+- [x] Master volume slider (Core Audio)
+- [x] Always-on-top window (default on, toggle)
+- [x] Sleep/screen suppression (`SetThreadExecutionState`)
 
 ### Phase 2: Spotify Control
 - [ ] Media key simulation (play/pause/next/prev)
