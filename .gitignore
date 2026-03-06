@@ -1,0 +1,21 @@
+# Build results
+bin/
+obj/
+publish/
+
+# User-specific files
+*.user
+*.suo
+*.userprefs
+
+# IDE
+.vs/
+.idea/
+*.swp
+
+# NuGet
+packages/
+
+# OS files
+Thumbs.db
+.DS_Store
