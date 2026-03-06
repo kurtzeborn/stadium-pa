@@ -94,17 +94,17 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         ToggleMuteCommand = new RelayCommand(ToggleMute);
         ToggleAlwaysOnTopCommand = new RelayCommand(ToggleAlwaysOnTop);
 
-        // Spotify commands (clear killed state on any transport action)
-        SpotifyPrevCommand = new RelayCommand(() => { ClearKilledStateIfNeeded(); MediaKeyService.PreviousTrack(); });
-        SpotifyPlayPauseCommand = new RelayCommand(() => { ClearKilledStateIfNeeded(); MediaKeyService.PlayPause(); });
-        SpotifyNextCommand = new RelayCommand(() => { ClearKilledStateIfNeeded(); MediaKeyService.NextTrack(); });
+        // Spotify commands (reset fade state on any transport action)
+        SpotifyPrevCommand = new RelayCommand(() => { ResetToNormalState(); MediaKeyService.PreviousTrack(); });
+        SpotifyPlayPauseCommand = new RelayCommand(() => { ResetToNormalState(); MediaKeyService.PlayPause(); });
+        SpotifyNextCommand = new RelayCommand(() => { ResetToNormalState(); MediaKeyService.NextTrack(); });
 
         // Timeout = next track (same media key)
-        TimeoutNextSongCommand = new RelayCommand(() => { ClearKilledStateIfNeeded(); MediaKeyService.NextTrack(); });
+        TimeoutNextSongCommand = new RelayCommand(() => { ResetToNormalState(); MediaKeyService.NextTrack(); });
 
-        // Local audio commands (clear killed state on play)
-        AnthemCommand = new RelayCommand(() => { ClearKilledStateIfNeeded(); _anthemPlayer.TogglePlayback(); }, () => _anthemPlayer.IsLoaded);
-        GoalCommand = new RelayCommand(() => { ClearKilledStateIfNeeded(); _goalPlayer.TogglePlayback(); }, () => _goalPlayer.IsLoaded);
+        // Local audio commands (reset fade state + ensure full volume before playing)
+        AnthemCommand = new RelayCommand(() => { ResetToNormalState(); _anthemPlayer.Volume = 1.0f; _anthemPlayer.TogglePlayback(); }, () => _anthemPlayer.IsLoaded);
+        GoalCommand = new RelayCommand(() => { ResetToNormalState(); _goalPlayer.Volume = 1.0f; _goalPlayer.TogglePlayback(); }, () => _goalPlayer.IsLoaded);
         BrowseAnthemFileCommand = new RelayCommand(BrowseAnthemFile);
         BrowseGoalFileCommand = new RelayCommand(BrowseGoalFile);
 
@@ -298,16 +298,28 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     }
 
     /// <summary>
-    /// If audio was killed, restores saved volumes and clears killed state.
-    /// Called before any manual play command so the user can restart normally.
+    /// If audio is in any non-Normal state (Dimmed, FadedOut, Killed),
+    /// cancels active fades, restores saved volumes, resumes paused audio,
+    /// and returns to Normal. Called before any manual play/transport command
+    /// so the operator can start fresh.
     /// </summary>
-    private void ClearKilledStateIfNeeded()
+    private void ResetToNormalState()
     {
-        if (_audioState != AudioControlState.Killed) return;
+        if (_audioState == AudioControlState.Normal) return;
 
+        _fader.Cancel();
+
+        // Restore saved volumes
         _spotifyVolume.Volume = _savedSpotifyVol;
+        _spotifyVolumeLevel = _savedSpotifyVol;
+        OnPropertyChanged(nameof(SpotifyVolume));
+        OnPropertyChanged(nameof(SpotifyVolumePercent));
         _anthemPlayer.Volume = _savedAnthemVol;
         _goalPlayer.Volume = _savedGoalVol;
+
+        // Resume anything we paused (FadedOut state)
+        ResumeActiveAudio();
+
         SetAudioState(AudioControlState.Normal);
     }
 
