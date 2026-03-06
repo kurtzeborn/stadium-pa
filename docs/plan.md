@@ -82,17 +82,17 @@ Three buttons for controlling whatever audio is currently playing (Spotify or lo
 All three act on the **active audio source** — whichever of Spotify or local audio is currently producing sound. If both are somehow playing, they act on both.
 
 #### 6a. DIM (toggle)
-- **First press**: smoothly fades active audio → **10%** over ~1 second
-- **Second press**: smoothly restores back to previous volume level
+- **First press**: smoothly fades active audio → **dim level** (default 10%) over **fade duration** (default 1s)
+- **Second press**: smoothly restores back to previous volume level over same fade duration
 - Use case: talking over music (e.g., announcing a goal scorer while celebration plays, or making a quick comment over pregame music)
-- Visual indicator shows dimmed state
+- **Color-coded state**: button glows **amber/yellow** border while dimmed
 - Audio continues playing — just quieter
 
 #### 6b. FADE OUT (toggle)
-- **First press**: smoothly fades active audio → **0%** over ~1 second, then **pauses/stops** playback
+- **First press**: smoothly fades active audio → **0%** over **fade duration** (default 1s), then **pauses/stops** playback
 - **Second press**: **resumes** playback and smoothly restores volume
 - Use case: ending a segment cleanly (e.g., pregame winding down, stopping goal celebration when play resumes)
-- Visual indicator shows faded-out state
+- **Color-coded state**: button glows **blue** border while faded out
 
 #### 6c. KILL (instant)
 - **Press**: immediately sets volume to **0%** and **pauses/stops** playback — no fade
@@ -121,9 +121,10 @@ MMDeviceEnumerator
         → Find session where Process.ProcessName == "Spotify"
           → SimpleAudioVolume.Volume = 0.0f .. 1.0f
 ```
-- Smooth fade: timer-based interpolation (e.g., 50ms steps over 1 second)
+- Smooth fade: timer-based interpolation (e.g., 50ms steps over configurable duration)
+- Fade duration and dim level are user-configurable in settings (see Settings Persistence)
 - Three audio control modes:
-  - **DIM**: fade → 10%, keep playing (toggle)
+  - **DIM**: fade → configurable dim level (default 10%), keep playing (toggle)
   - **FADE OUT**: fade → 0%, then pause/stop (toggle)
   - **KILL**: instant → 0% + stop (one-shot)
 - Fader needs to be reusable for both Spotify per-process volume and NAudio playback volume
@@ -231,7 +232,12 @@ waveOut.Play();
 - **Dark theme** — high-contrast dark background for readability in sun or shade
 - **Touch-first design** — primary input is a touch screen laptop; all buttons must be large enough to avoid fat-fingering (minimum ~80x80dp hit targets, generous spacing between buttons)
 - Keyboard shortcuts available as a secondary input method
-- Visual feedback: active/playing state highlighted
+- **Color-coded button states** — glowing borders so the operator can track state at a glance:
+  - **Amber/yellow glow** = DIM active (audio at dim level, still playing)
+  - **Blue glow** = FADE OUT active (audio stopped, ready to restore)
+  - **Red glow** = KILL fired (audio killed, manual restart needed)
+  - **Green glow** = Anthem or Goal currently playing
+  - **No glow** = idle / normal
 - Always-on-top by default
 
 ## NuGet Dependencies
@@ -271,9 +277,20 @@ stadium-pa/
 
 ## Settings Persistence
 
-- Store user settings (anthem file path, goal file path, default volumes) in a JSON file
+- Store user settings in a JSON file
 - Location: `%APPDATA%\StadiumPA\settings.json`
 - Load on startup, save on change
+
+**Persisted settings:**
+| Setting | Default | Description |
+|---|---|---|
+| `anthemFilePath` | *(none)* | Path to national anthem audio file |
+| `goalFilePath` | *(none)* | Path to goal celebration audio file |
+| `fadeDurationMs` | `1000` | Duration of DIM / FADE OUT fades in milliseconds |
+| `dimLevel` | `0.10` | Volume level for DIM (0.0–1.0) |
+| `defaultMasterVolume` | `0.80` | Master volume on startup |
+| `defaultSpotifyVolume` | `0.80` | Spotify volume on startup |
+| `alwaysOnTop` | `true` | Keep window above all others |
 
 ## Pre-Game Setup Checklist
 
@@ -356,7 +373,7 @@ There are **4 manual playlist switches** during a game. Each is a quick tap in t
 - [ ] DIM toggle — fade to 10%, restore to previous
 - [ ] FADE OUT toggle — fade to 0% + pause/stop, restore + resume
 - [ ] KILL one-shot — instant 0% + stop
-- [ ] Visual indicators for dimmed / faded-out states
+- [ ] Color-coded button state visuals (amber=DIM, blue=FADE OUT, red=KILL, green=playing)
 - [ ] State machine: DIM → FADE OUT transitions correctly, KILL clears all states
 
 ### Phase 5: Polish
