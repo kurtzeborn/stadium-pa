@@ -364,12 +364,12 @@ There are **4 manual playlist switches** during a game. Each is a quick tap in t
 - [x] Spotify process detection
 - [x] Keyboard shortcuts for core controls (KILL as global hotkey)
 
-### Phase 3: Local Audio Playback
-- [ ] NAudio playback engine for local files
-- [ ] Audio file pre-loading into memory on startup
-- [ ] Anthem button with file picker in settings
-- [ ] Goal button with file picker in settings
-- [ ] Elapsed / total time progress indicator on Anthem and Goal
+### Phase 3: Local Audio Playback ✅
+- [x] NAudio playback engine for local files
+- [x] Audio file pre-loading into memory on startup
+- [x] Anthem button with file picker in settings
+- [x] Goal button with file picker in settings
+- [x] Elapsed / total time progress indicator on Anthem and Goal
 
 ### Phase 4: Audio Control Buttons (DIM / FADE OUT / KILL)
 - [ ] Volume fader utility (smooth interpolation, configurable target level)

@@ -13,6 +13,9 @@
         Background="#1E1E1E">
 
     <Window.Resources>
+        <!-- Converters -->
+        <converters:BoolToPlayingBorderConverter x:Key="PlayingBorderConverter"/>
+
         <!-- Base button style: dark, touch-friendly, large hit targets -->
         <Style x:Key="TouchButton" TargetType="Button">
             <Setter Property="MinHeight" Value="60"/>
@@ -57,6 +60,16 @@
         <Style x:Key="LargeActionButton" TargetType="Button" BasedOn="{StaticResource TouchButton}">
             <Setter Property="MinHeight" Value="90"/>
             <Setter Property="FontSize" Value="18"/>
+        </Style>
+
+        <!-- Large action button with green glow when playing -->
+        <Style x:Key="PlayingActionButton" TargetType="Button" BasedOn="{StaticResource LargeActionButton}">
+            <Setter Property="MinHeight" Value="90"/>
+            <Setter Property="Background" Value="#333333"/>
+            <Setter Property="BorderBrush" Value="#555555"/>
+            <Setter Property="BorderThickness" Value="3"/>
+            <Setter Property="Tag" Value="#444444"/>
+            <Setter Property="Template" Value="{StaticResource AccentButtonTemplate}"/>
         </Style>
 
         <!-- Accent button base: reusable template with colored border, background, hover/press states -->
@@ -236,20 +249,26 @@
 
         <!-- ═══ ANTHEM / GOAL ═══ -->
         <UniformGrid Columns="2" Margin="8,4,8,8">
-            <Button Style="{StaticResource LargeActionButton}" IsEnabled="False" ToolTip="Phase 3"
+            <Button Style="{StaticResource PlayingActionButton}"
                     Command="{Binding AnthemCommand}">
+                <Button.BorderBrush>
+                    <SolidColorBrush Color="{Binding IsAnthemPlaying, Converter={StaticResource PlayingBorderConverter}}"/>
+                </Button.BorderBrush>
                 <StackPanel>
                     <TextBlock Text="🏳 NATIONAL" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
                     <TextBlock Text="ANTHEM" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
-                    <TextBlock Text="—:— / —:—" FontSize="12" HorizontalAlignment="Center" Foreground="#777"/>
+                    <TextBlock Text="{Binding AnthemTimeDisplay}" FontSize="12" HorizontalAlignment="Center" Foreground="#777"/>
                 </StackPanel>
             </Button>
-            <Button Style="{StaticResource LargeActionButton}" IsEnabled="False" ToolTip="Phase 3"
+            <Button Style="{StaticResource PlayingActionButton}"
                     Command="{Binding GoalCommand}">
+                <Button.BorderBrush>
+                    <SolidColorBrush Color="{Binding IsGoalPlaying, Converter={StaticResource PlayingBorderConverter}}"/>
+                </Button.BorderBrush>
                 <StackPanel>
                     <TextBlock Text="🥅 GOAL!" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
                     <TextBlock Text="CELEBRATION" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
-                    <TextBlock Text="—:— / —:—" FontSize="12" HorizontalAlignment="Center" Foreground="#777"/>
+                    <TextBlock Text="{Binding GoalTimeDisplay}" FontSize="12" HorizontalAlignment="Center" Foreground="#777"/>
                 </StackPanel>
             </Button>
         </UniformGrid>
@@ -262,12 +281,26 @@
             <TextBlock Text="⏱ TIMEOUT — NEXT SONG" FontSize="18" FontWeight="Bold"/>
         </Button>
 
-        <!-- Settings placeholder -->
+        <!-- Settings -->
         <Separator Background="#444444" Margin="8,2"/>
         <TextBlock Style="{StaticResource SectionLabel}" Text="SETTINGS"/>
         <StackPanel Margin="12,0,12,12">
-            <TextBlock Foreground="#777" FontSize="12" Text="Anthem File: (not configured — Phase 3)" Margin="0,2"/>
-            <TextBlock Foreground="#777" FontSize="12" Text="Goal File: (not configured — Phase 3)" Margin="0,2"/>
+            <DockPanel Margin="0,2">
+                <Button Style="{StaticResource ToggleIconButton}" Content="📂" DockPanel.Dock="Right"
+                        Command="{Binding BrowseAnthemFileCommand}" ToolTip="Browse for anthem file"
+                        MinWidth="40" MinHeight="30" Padding="6,2"/>
+                <TextBlock Foreground="#AAA" FontSize="12" VerticalAlignment="Center">
+                    <Run Text="Anthem: "/><Run Text="{Binding AnthemFileDisplay, Mode=OneWay}" Foreground="#DDD"/>
+                </TextBlock>
+            </DockPanel>
+            <DockPanel Margin="0,2">
+                <Button Style="{StaticResource ToggleIconButton}" Content="📂" DockPanel.Dock="Right"
+                        Command="{Binding BrowseGoalFileCommand}" ToolTip="Browse for goal file"
+                        MinWidth="40" MinHeight="30" Padding="6,2"/>
+                <TextBlock Foreground="#AAA" FontSize="12" VerticalAlignment="Center">
+                    <Run Text="Goal: "/><Run Text="{Binding GoalFileDisplay, Mode=OneWay}" Foreground="#DDD"/>
+                </TextBlock>
+            </DockPanel>
         </StackPanel>
 
     </StackPanel>

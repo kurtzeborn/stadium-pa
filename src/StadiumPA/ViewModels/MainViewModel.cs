@@ -1,19 +1,24 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
+using System.Windows.Threading;
 using StadiumPA.Services;
 
 namespace StadiumPA.ViewModels;
 
 /// <summary>
-/// Main view model — Phase 1 + Phase 2: master volume, mute, always-on-top,
-/// Spotify media key control, Spotify per-process volume, keyboard shortcuts.
+/// Main view model — Phases 1–3: master volume, mute, always-on-top,
+/// Spotify media key control, Spotify per-process volume, keyboard shortcuts,
+/// local audio playback (anthem + goal) with elapsed/total time indicators.
 /// </summary>
 public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 {
     private readonly MasterVolumeService _masterVolume;
     private readonly SleepSuppressionService _sleepSuppression;
     private readonly SpotifyVolumeService _spotifyVolume;
+    private readonly AudioPlayerService _anthemPlayer;
+    private readonly AudioPlayerService _goalPlayer;
+    private readonly DispatcherTimer _playbackTimer;
 
     private float _masterVolumeLevel;
     private bool _isMuted;
@@ -27,6 +32,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _masterVolume = new MasterVolumeService();
         _sleepSuppression = new SleepSuppressionService();
         _spotifyVolume = new SpotifyVolumeService();
+        _anthemPlayer = new AudioPlayerService();
+        _goalPlayer = new AudioPlayerService();
+
+        // Timer to update elapsed/total time display during playback
+        _playbackTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        _playbackTimer.Tick += (_, _) => RefreshPlaybackTimes();
+
+        // Wire playback state changes to start/stop the timer
+        _anthemPlayer.PlaybackStateChanged += OnAnyPlaybackStateChanged;
+        _goalPlayer.PlaybackStateChanged += OnAnyPlaybackStateChanged;
 
         // Enable sleep suppression on startup
         _sleepSuppression.Enable();
@@ -54,12 +69,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         // Timeout = next track (same media key)
         TimeoutNextSongCommand = new RelayCommand(MediaKeyService.NextTrack);
 
+        // Local audio commands
+        AnthemCommand = new RelayCommand(() => _anthemPlayer.TogglePlayback(), () => _anthemPlayer.IsLoaded);
+        GoalCommand = new RelayCommand(() => _goalPlayer.TogglePlayback(), () => _goalPlayer.IsLoaded);
+        BrowseAnthemFileCommand = new RelayCommand(BrowseAnthemFile);
+        BrowseGoalFileCommand = new RelayCommand(BrowseGoalFile);
+
         // Placeholder commands (non-functional stubs until later phases)
         DimCommand = new RelayCommand(() => { });
         FadeOutCommand = new RelayCommand(() => { });
         KillCommand = new RelayCommand(() => { });
-        AnthemCommand = new RelayCommand(() => { });
-        GoalCommand = new RelayCommand(() => { });
     }
 
     #region Master Volume
@@ -170,10 +189,109 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     #endregion
 
-    #region Local Audio (Placeholder — Phase 3)
+    #region Local Audio (Phase 3)
 
     public ICommand AnthemCommand { get; }
     public ICommand GoalCommand { get; }
+    public ICommand BrowseAnthemFileCommand { get; }
+    public ICommand BrowseGoalFileCommand { get; }
+
+    /// <summary>Anthem file path display text for the UI.</summary>
+    public string AnthemFileDisplay => _anthemPlayer.IsLoaded
+        ? System.IO.Path.GetFileName(_anthemPlayer.FilePath!)
+        : "(not configured)";
+
+    /// <summary>Goal file path display text for the UI.</summary>
+    public string GoalFileDisplay => _goalPlayer.IsLoaded
+        ? System.IO.Path.GetFileName(_goalPlayer.FilePath!)
+        : "(not configured)";
+
+    /// <summary>Whether the anthem is currently playing (for green glow state).</summary>
+    public bool IsAnthemPlaying => _anthemPlayer.IsPlaying;
+
+    /// <summary>Whether the goal celebration is currently playing (for green glow state).</summary>
+    public bool IsGoalPlaying => _goalPlayer.IsPlaying;
+
+    /// <summary>Formatted elapsed / total for anthem: "1:23 / 2:10"</summary>
+    public string AnthemTimeDisplay => FormatTimeDisplay(_anthemPlayer);
+
+    /// <summary>Formatted elapsed / total for goal: "0:45 / 1:02"</summary>
+    public string GoalTimeDisplay => FormatTimeDisplay(_goalPlayer);
+
+    /// <summary>
+    /// Loads an anthem audio file for instant playback.
+    /// </summary>
+    public void LoadAnthemFile(string path)
+    {
+        _anthemPlayer.LoadFile(path);
+        OnPropertyChanged(nameof(AnthemFileDisplay));
+        OnPropertyChanged(nameof(AnthemTimeDisplay));
+    }
+
+    /// <summary>
+    /// Loads a goal celebration audio file for instant playback.
+    /// </summary>
+    public void LoadGoalFile(string path)
+    {
+        _goalPlayer.LoadFile(path);
+        OnPropertyChanged(nameof(GoalFileDisplay));
+        OnPropertyChanged(nameof(GoalTimeDisplay));
+    }
+
+    private void BrowseAnthemFile()
+    {
+        var path = ShowAudioFileDialog("Select National Anthem File");
+        if (path is not null) LoadAnthemFile(path);
+    }
+
+    private void BrowseGoalFile()
+    {
+        var path = ShowAudioFileDialog("Select Goal Celebration File");
+        if (path is not null) LoadGoalFile(path);
+    }
+
+    private static string? ShowAudioFileDialog(string title)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = title,
+            Filter = "Audio Files|*.mp3;*.wav|All Files|*.*",
+            CheckFileExists = true,
+        };
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
+    private static string FormatTimeDisplay(AudioPlayerService player)
+    {
+        if (!player.IsLoaded) return "—:— / —:—";
+
+        var elapsed = player.CurrentTime;
+        var total = player.TotalTime;
+        return $"{(int)elapsed.TotalMinutes}:{elapsed.Seconds:D2} / {(int)total.TotalMinutes}:{total.Seconds:D2}";
+    }
+
+    private void OnAnyPlaybackStateChanged()
+    {
+        // Start or stop the UI timer based on whether anything is playing
+        if (_anthemPlayer.IsPlaying || _goalPlayer.IsPlaying)
+        {
+            if (!_playbackTimer.IsEnabled) _playbackTimer.Start();
+        }
+        else
+        {
+            _playbackTimer.Stop();
+        }
+
+        RefreshPlaybackTimes();
+        OnPropertyChanged(nameof(IsAnthemPlaying));
+        OnPropertyChanged(nameof(IsGoalPlaying));
+    }
+
+    private void RefreshPlaybackTimes()
+    {
+        OnPropertyChanged(nameof(AnthemTimeDisplay));
+        OnPropertyChanged(nameof(GoalTimeDisplay));
+    }
 
     #endregion
 
@@ -202,6 +320,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public void Dispose()
     {
+        _playbackTimer.Stop();
+        _anthemPlayer.PlaybackStateChanged -= OnAnyPlaybackStateChanged;
+        _goalPlayer.PlaybackStateChanged -= OnAnyPlaybackStateChanged;
+        _anthemPlayer.Dispose();
+        _goalPlayer.Dispose();
         _sleepSuppression.Dispose();
         _spotifyVolume.Dispose();
         _masterVolume.Dispose();
