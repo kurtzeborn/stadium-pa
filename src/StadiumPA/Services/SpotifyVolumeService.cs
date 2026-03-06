@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using NAudio.CoreAudioApi;
-using NAudio.CoreAudioApi.Interfaces;
 
 namespace StadiumPA.Services;
 
@@ -58,34 +57,22 @@ public sealed class SpotifyVolumeService : IDisposable
     }
 
     /// <summary>
-    /// Enumerates audio sessions to find the one belonging to Spotify.
+    /// Finds the audio session belonging to Spotify by matching process ID.
+    /// Gets the Spotify PID first, then scans sessions — avoids creating
+    /// a Process object for every audio session.
     /// </summary>
     private AudioSessionControl? GetSpotifySession()
     {
-        var sessionManager = _device.AudioSessionManager;
-        var sessions = sessionManager.Sessions;
+        var spotifyPid = FindSpotifyProcessId();
+        if (spotifyPid is null) return null;
 
+        var sessions = _device.AudioSessionManager.Sessions;
         for (int i = 0; i < sessions.Count; i++)
         {
             var session = sessions[i];
-            try
+            if (session.GetProcessID == spotifyPid.Value)
             {
-                var processId = session.GetProcessID;
-                if (processId == 0) continue;
-
-                using var process = Process.GetProcessById((int)processId);
-                if (process.ProcessName.Equals("Spotify", StringComparison.OrdinalIgnoreCase))
-                {
-                    return session;
-                }
-            }
-            catch (ArgumentException)
-            {
-                // Process no longer exists — skip
-            }
-            catch (InvalidOperationException)
-            {
-                // Process exited between getting ID and name — skip
+                return session;
             }
         }
 

@@ -3,7 +3,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:StadiumPA"
         xmlns:converters="clr-namespace:StadiumPA.Converters"
         mc:Ignorable="d"
         Title="STADIUM PA"
@@ -228,7 +227,7 @@
             <Button Style="{StaticResource TouchButton}" Content="⏮ PREV"
                     Command="{Binding SpotifyPrevCommand}" ToolTip="Ctrl+Left"/>
             <Button Style="{StaticResource TouchButton}" Content="⏯ PLAY / PAUSE"
-                    Command="{Binding SpotifyPlayPauseCommand}" ToolTip="Space"/>
+                    Command="{Binding SpotifyPlayPauseCommand}" ToolTip="Ctrl+Space"/>
             <Button Style="{StaticResource TouchButton}" Content="⏭ NEXT"
                     Command="{Binding SpotifyNextCommand}" ToolTip="Ctrl+Right"/>
         </UniformGrid>

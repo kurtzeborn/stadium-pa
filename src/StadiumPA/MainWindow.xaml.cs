@@ -18,7 +18,7 @@ public partial class MainWindow : Window
         DataContext = _viewModel;
 
         // Keyboard shortcuts
-        InputBindings.Add(new KeyBinding(_viewModel.SpotifyPlayPauseCommand, Key.Space, ModifierKeys.None));
+        InputBindings.Add(new KeyBinding(_viewModel.SpotifyPlayPauseCommand, Key.Space, ModifierKeys.Control));
         InputBindings.Add(new KeyBinding(_viewModel.SpotifyNextCommand, Key.Right, ModifierKeys.Control));
         InputBindings.Add(new KeyBinding(_viewModel.SpotifyPrevCommand, Key.Left, ModifierKeys.Control));
         InputBindings.Add(new KeyBinding(_viewModel.ToggleMuteCommand, Key.M, ModifierKeys.Control));
