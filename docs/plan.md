@@ -371,14 +371,14 @@ There are **4 manual playlist switches** during a game. Each is a quick tap in t
 - [x] Goal button with file picker in settings
 - [x] Elapsed / total time progress indicator on Anthem and Goal
 
-### Phase 4: Audio Control Buttons (DIM / FADE OUT / KILL)
-- [ ] Volume fader utility (smooth interpolation, configurable target level)
-- [ ] Active audio source detection (Spotify session, local playback, or both)
-- [ ] DIM toggle — fade to 10%, restore to previous
-- [ ] FADE OUT toggle — fade to 0% + pause/stop, restore + resume
-- [ ] KILL one-shot — instant 0% + stop
-- [ ] Color-coded button state visuals (amber=DIM, blue=FADE OUT, red=KILL, green=playing)
-- [ ] State machine: DIM → FADE OUT transitions correctly, KILL clears all states
+### Phase 4: Audio Control Buttons (DIM / FADE OUT / KILL) ✅
+- [x] Volume fader utility (smooth interpolation, configurable target level)
+- [x] Active audio source detection (Spotify session, local playback, or both)
+- [x] DIM toggle — fade to 10%, restore to previous
+- [x] FADE OUT toggle — fade to 0% + pause/stop, restore + resume
+- [x] KILL one-shot — instant 0% + stop
+- [x] Color-coded button state visuals (amber=DIM, blue=FADE OUT, red=KILL, green=playing)
+- [x] State machine: DIM → FADE OUT transitions correctly, KILL clears all states
 
 ### Phase 5: Polish
 - [ ] Settings persistence (JSON)

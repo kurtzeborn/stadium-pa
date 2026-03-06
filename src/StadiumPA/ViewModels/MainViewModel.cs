@@ -7,9 +7,10 @@ using StadiumPA.Services;
 namespace StadiumPA.ViewModels;
 
 /// <summary>
-/// Main view model — Phases 1–3: master volume, mute, always-on-top,
+/// Main view model — Phases 1–4: master volume, mute, always-on-top,
 /// Spotify media key control, Spotify per-process volume, keyboard shortcuts,
-/// local audio playback (anthem + goal) with elapsed/total time indicators.
+/// local audio playback (anthem + goal) with elapsed/total time indicators,
+/// DIM/FADE OUT/KILL audio control state machine with smooth volume fading.
 /// </summary>
 public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 {
@@ -19,6 +20,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private readonly AudioPlayerService _anthemPlayer;
     private readonly AudioPlayerService _goalPlayer;
     private readonly DispatcherTimer _playbackTimer;
+    private readonly VolumeFader _fader;
 
     private float _masterVolumeLevel;
     private bool _isMuted;
@@ -27,6 +29,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private float _spotifyVolumeLevel = 0.80f;
     private bool _isSpotifyRunning;
 
+    // Audio control state machine (Phase 4)
+    private AudioControlState _audioState = AudioControlState.Normal;
+    private float _savedSpotifyVol;
+    private float _savedAnthemVol = 1.0f;
+    private float _savedGoalVol = 1.0f;
+    private bool _spotifyWasPausedByUs;
+    private bool _anthemWasPausedByUs;
+    private bool _goalWasPausedByUs;
+
+    private const float DimLevel = 0.10f;
+    private const int FadeDurationMs = 1000;
+
     public MainViewModel()
     {
         _masterVolume = new MasterVolumeService();
@@ -34,6 +48,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _spotifyVolume = new SpotifyVolumeService();
         _anthemPlayer = new AudioPlayerService();
         _goalPlayer = new AudioPlayerService();
+        _fader = new VolumeFader();
 
         // Timer to update elapsed/total time display during playback
         _playbackTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
@@ -61,24 +76,24 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         ToggleMuteCommand = new RelayCommand(ToggleMute);
         ToggleAlwaysOnTopCommand = new RelayCommand(ToggleAlwaysOnTop);
 
-        // Spotify commands
-        SpotifyPrevCommand = new RelayCommand(MediaKeyService.PreviousTrack);
-        SpotifyPlayPauseCommand = new RelayCommand(MediaKeyService.PlayPause);
-        SpotifyNextCommand = new RelayCommand(MediaKeyService.NextTrack);
+        // Spotify commands (clear killed state on any transport action)
+        SpotifyPrevCommand = new RelayCommand(() => { ClearKilledStateIfNeeded(); MediaKeyService.PreviousTrack(); });
+        SpotifyPlayPauseCommand = new RelayCommand(() => { ClearKilledStateIfNeeded(); MediaKeyService.PlayPause(); });
+        SpotifyNextCommand = new RelayCommand(() => { ClearKilledStateIfNeeded(); MediaKeyService.NextTrack(); });
 
         // Timeout = next track (same media key)
-        TimeoutNextSongCommand = new RelayCommand(MediaKeyService.NextTrack);
+        TimeoutNextSongCommand = new RelayCommand(() => { ClearKilledStateIfNeeded(); MediaKeyService.NextTrack(); });
 
-        // Local audio commands
-        AnthemCommand = new RelayCommand(() => _anthemPlayer.TogglePlayback(), () => _anthemPlayer.IsLoaded);
-        GoalCommand = new RelayCommand(() => _goalPlayer.TogglePlayback(), () => _goalPlayer.IsLoaded);
+        // Local audio commands (clear killed state on play)
+        AnthemCommand = new RelayCommand(() => { ClearKilledStateIfNeeded(); _anthemPlayer.TogglePlayback(); }, () => _anthemPlayer.IsLoaded);
+        GoalCommand = new RelayCommand(() => { ClearKilledStateIfNeeded(); _goalPlayer.TogglePlayback(); }, () => _goalPlayer.IsLoaded);
         BrowseAnthemFileCommand = new RelayCommand(BrowseAnthemFile);
         BrowseGoalFileCommand = new RelayCommand(BrowseGoalFile);
 
-        // Placeholder commands (non-functional stubs until later phases)
-        DimCommand = new RelayCommand(() => { });
-        FadeOutCommand = new RelayCommand(() => { });
-        KillCommand = new RelayCommand(() => { });
+        // Audio control commands (Phase 4)
+        DimCommand = new RelayCommand(ExecuteDim);
+        FadeOutCommand = new RelayCommand(ExecuteFadeOut);
+        KillCommand = new RelayCommand(ExecuteKill);
     }
 
     #region Master Volume
@@ -181,11 +196,212 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     #endregion
 
-    #region Audio Control Buttons (Placeholder — Phase 4)
+    #region Audio Control Buttons (Phase 4)
 
     public ICommand DimCommand { get; }
     public ICommand FadeOutCommand { get; }
     public ICommand KillCommand { get; }
+
+    /// <summary>Whether DIM is currently active (amber glow).</summary>
+    public bool IsDimActive => _audioState == AudioControlState.Dimmed;
+
+    /// <summary>Whether FADE OUT is currently active (blue glow).</summary>
+    public bool IsFadeOutActive => _audioState == AudioControlState.FadedOut;
+
+    /// <summary>Whether KILL was fired and audio hasn't been manually restarted (red glow).</summary>
+    public bool IsKilled => _audioState == AudioControlState.Killed;
+
+    private void SetAudioState(AudioControlState state)
+    {
+        _audioState = state;
+        OnPropertyChanged(nameof(IsDimActive));
+        OnPropertyChanged(nameof(IsFadeOutActive));
+        OnPropertyChanged(nameof(IsKilled));
+    }
+
+    private void SaveActiveVolumes()
+    {
+        _savedSpotifyVol = _spotifyVolumeLevel;
+        _savedAnthemVol = _anthemPlayer.Volume;
+        _savedGoalVol = _goalPlayer.Volume;
+    }
+
+    private void SetAllActiveVolumes(float spotifyVol, float anthemVol, float goalVol)
+    {
+        _spotifyVolume.Volume = spotifyVol;
+        _anthemPlayer.Volume = anthemVol;
+        _goalPlayer.Volume = goalVol;
+    }
+
+    private void PauseActiveAudio()
+    {
+        _spotifyWasPausedByUs = _spotifyVolume.IsSpotifyActive;
+        if (_spotifyWasPausedByUs)
+            MediaKeyService.PlayPause();
+
+        _anthemWasPausedByUs = _anthemPlayer.IsPlaying;
+        if (_anthemWasPausedByUs)
+            _anthemPlayer.Pause();
+
+        _goalWasPausedByUs = _goalPlayer.IsPlaying;
+        if (_goalWasPausedByUs)
+            _goalPlayer.Pause();
+    }
+
+    private void ResumeActiveAudio()
+    {
+        if (_spotifyWasPausedByUs)
+            MediaKeyService.PlayPause();
+        if (_anthemWasPausedByUs)
+            _anthemPlayer.Resume();
+        if (_goalWasPausedByUs)
+            _goalPlayer.Resume();
+
+        _spotifyWasPausedByUs = false;
+        _anthemWasPausedByUs = false;
+        _goalWasPausedByUs = false;
+    }
+
+    /// <summary>
+    /// If audio was killed, restores saved volumes and clears killed state.
+    /// Called before any manual play command so the user can restart normally.
+    /// </summary>
+    private void ClearKilledStateIfNeeded()
+    {
+        if (_audioState != AudioControlState.Killed) return;
+
+        _spotifyVolume.Volume = _savedSpotifyVol;
+        _anthemPlayer.Volume = _savedAnthemVol;
+        _goalPlayer.Volume = _savedGoalVol;
+        SetAudioState(AudioControlState.Normal);
+    }
+
+    private static float Lerp(float a, float b, float t) => a + (b - a) * t;
+
+    private void ExecuteDim()
+    {
+        _fader.Cancel();
+
+        switch (_audioState)
+        {
+            case AudioControlState.Normal:
+            {
+                SaveActiveVolumes();
+                var fromS = _spotifyVolume.Volume ?? _savedSpotifyVol;
+                var fromA = _anthemPlayer.Volume;
+                var fromG = _goalPlayer.Volume;
+                SetAudioState(AudioControlState.Dimmed);
+                _fader.Start(FadeDurationMs, t =>
+                {
+                    SetAllActiveVolumes(
+                        Lerp(fromS, DimLevel, t),
+                        Lerp(fromA, DimLevel, t),
+                        Lerp(fromG, DimLevel, t));
+                });
+                break;
+            }
+
+            case AudioControlState.Dimmed:
+            {
+                var curS = _spotifyVolume.Volume ?? DimLevel;
+                var curA = _anthemPlayer.Volume;
+                var curG = _goalPlayer.Volume;
+                SetAudioState(AudioControlState.Normal);
+                _fader.Start(FadeDurationMs, t =>
+                {
+                    SetAllActiveVolumes(
+                        Lerp(curS, _savedSpotifyVol, t),
+                        Lerp(curA, _savedAnthemVol, t),
+                        Lerp(curG, _savedGoalVol, t));
+                });
+                break;
+            }
+
+            default:
+                break; // FadedOut, Killed: no-op
+        }
+    }
+
+    private void ExecuteFadeOut()
+    {
+        _fader.Cancel();
+
+        switch (_audioState)
+        {
+            case AudioControlState.Normal:
+            {
+                SaveActiveVolumes();
+                var fromS = _spotifyVolume.Volume ?? _savedSpotifyVol;
+                var fromA = _anthemPlayer.Volume;
+                var fromG = _goalPlayer.Volume;
+                SetAudioState(AudioControlState.FadedOut);
+                _fader.Start(FadeDurationMs, t =>
+                {
+                    SetAllActiveVolumes(
+                        Lerp(fromS, 0f, t),
+                        Lerp(fromA, 0f, t),
+                        Lerp(fromG, 0f, t));
+                }, PauseActiveAudio);
+                break;
+            }
+
+            case AudioControlState.Dimmed:
+            {
+                var curS = _spotifyVolume.Volume ?? DimLevel;
+                var curA = _anthemPlayer.Volume;
+                var curG = _goalPlayer.Volume;
+                SetAudioState(AudioControlState.FadedOut);
+                _fader.Start(FadeDurationMs, t =>
+                {
+                    SetAllActiveVolumes(
+                        Lerp(curS, 0f, t),
+                        Lerp(curA, 0f, t),
+                        Lerp(curG, 0f, t));
+                }, PauseActiveAudio);
+                break;
+            }
+
+            case AudioControlState.FadedOut:
+            {
+                ResumeActiveAudio();
+                SetAudioState(AudioControlState.Normal);
+                _fader.Start(FadeDurationMs, t =>
+                {
+                    SetAllActiveVolumes(
+                        Lerp(0f, _savedSpotifyVol, t),
+                        Lerp(0f, _savedAnthemVol, t),
+                        Lerp(0f, _savedGoalVol, t));
+                });
+                break;
+            }
+
+            default:
+                break; // Killed: no-op
+        }
+    }
+
+    private void ExecuteKill()
+    {
+        _fader.Cancel();
+        if (_audioState == AudioControlState.Killed) return;
+
+        // Save volumes if coming directly from Normal
+        if (_audioState == AudioControlState.Normal)
+            SaveActiveVolumes();
+
+        // Instant volume cut
+        SetAllActiveVolumes(0f, 0f, 0f);
+
+        // Stop all local audio playback
+        if (_anthemPlayer.IsPlaying || _anthemPlayer.IsPaused) _anthemPlayer.Stop();
+        if (_goalPlayer.IsPlaying || _goalPlayer.IsPaused) _goalPlayer.Stop();
+
+        // Pause Spotify only if it's actively producing audio
+        if (_spotifyVolume.IsSpotifyActive)
+            MediaKeyService.PlayPause();
+
+        SetAudioState(AudioControlState.Killed);
+    }
 
     #endregion
 
@@ -320,6 +536,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public void Dispose()
     {
+        _fader.Dispose();
         _playbackTimer.Stop();
         _anthemPlayer.PlaybackStateChanged -= OnAnyPlaybackStateChanged;
         _goalPlayer.PlaybackStateChanged -= OnAnyPlaybackStateChanged;
@@ -329,4 +546,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _spotifyVolume.Dispose();
         _masterVolume.Dispose();
     }
+}
+
+/// <summary>
+/// State machine for the DIM / FADE OUT / KILL audio controls.
+/// </summary>
+public enum AudioControlState
+{
+    Normal,
+    Dimmed,
+    FadedOut,
+    Killed
 }

@@ -62,16 +62,6 @@
             <Setter Property="FontSize" Value="18"/>
         </Style>
 
-        <!-- Large action button with green glow when playing -->
-        <Style x:Key="PlayingActionButton" TargetType="Button" BasedOn="{StaticResource LargeActionButton}">
-            <Setter Property="MinHeight" Value="90"/>
-            <Setter Property="Background" Value="#333333"/>
-            <Setter Property="BorderBrush" Value="#555555"/>
-            <Setter Property="BorderThickness" Value="3"/>
-            <Setter Property="Tag" Value="#444444"/>
-            <Setter Property="Template" Value="{StaticResource AccentButtonTemplate}"/>
-        </Style>
-
         <!-- Accent button base: reusable template with colored border, background, hover/press states -->
         <ControlTemplate x:Key="AccentButtonTemplate" TargetType="Button">
             <Border x:Name="border"
@@ -96,7 +86,17 @@
             </ControlTemplate.Triggers>
         </ControlTemplate>
 
-        <!-- DIM button: amber accent -->
+        <!-- Large action button with green glow when playing -->
+        <Style x:Key="PlayingActionButton" TargetType="Button" BasedOn="{StaticResource LargeActionButton}">
+            <Setter Property="MinHeight" Value="90"/>
+            <Setter Property="Background" Value="#333333"/>
+            <Setter Property="BorderBrush" Value="#555555"/>
+            <Setter Property="BorderThickness" Value="3"/>
+            <Setter Property="Tag" Value="#444444"/>
+            <Setter Property="Template" Value="{StaticResource AccentButtonTemplate}"/>
+        </Style>
+
+        <!-- DIM button: amber accent, bright glow when active -->
         <Style x:Key="DimButton" TargetType="Button" BasedOn="{StaticResource TouchButton}">
             <Setter Property="MinHeight" Value="80"/>
             <Setter Property="Background" Value="#3D3520"/>
@@ -104,9 +104,15 @@
             <Setter Property="BorderThickness" Value="3"/>
             <Setter Property="Tag" Value="#4D4528"/>
             <Setter Property="Template" Value="{StaticResource AccentButtonTemplate}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsDimActive}" Value="True">
+                    <Setter Property="BorderBrush" Value="#FFDD44"/>
+                    <Setter Property="Background" Value="#504520"/>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
-        <!-- FADE OUT button: blue accent -->
+        <!-- FADE OUT button: blue accent, bright glow when active -->
         <Style x:Key="FadeOutButton" TargetType="Button" BasedOn="{StaticResource TouchButton}">
             <Setter Property="MinHeight" Value="80"/>
             <Setter Property="Background" Value="#1E2D3D"/>
@@ -114,9 +120,15 @@
             <Setter Property="BorderThickness" Value="3"/>
             <Setter Property="Tag" Value="#263D4D"/>
             <Setter Property="Template" Value="{StaticResource AccentButtonTemplate}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsFadeOutActive}" Value="True">
+                    <Setter Property="BorderBrush" Value="#66BBFF"/>
+                    <Setter Property="Background" Value="#263D55"/>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
-        <!-- KILL button: red accent -->
+        <!-- KILL button: red accent, bright glow when killed -->
         <Style x:Key="KillButton" TargetType="Button" BasedOn="{StaticResource TouchButton}">
             <Setter Property="MinHeight" Value="80"/>
             <Setter Property="Background" Value="#3D1E1E"/>
@@ -124,6 +136,12 @@
             <Setter Property="BorderThickness" Value="3"/>
             <Setter Property="Tag" Value="#4D2626"/>
             <Setter Property="Template" Value="{StaticResource AccentButtonTemplate}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsKilled}" Value="True">
+                    <Setter Property="BorderBrush" Value="#FF6666"/>
+                    <Setter Property="Background" Value="#552626"/>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <!-- Slider style for dark theme -->
@@ -201,22 +219,22 @@
 
         <!-- ═══ AUDIO CONTROLS (DIM / FADE OUT / KILL) ═══ -->
         <UniformGrid Columns="3" Margin="8,4,8,8">
-            <Button Style="{StaticResource DimButton}" IsEnabled="False" ToolTip="Phase 4"
+            <Button Style="{StaticResource DimButton}"
                     Command="{Binding DimCommand}">
                 <StackPanel>
                     <TextBlock Text="🔉 DIM" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#DDBB44"/>
                     <TextBlock Text="↓10% (toggle)" FontSize="11" HorizontalAlignment="Center" Foreground="#AA8833"/>
                 </StackPanel>
             </Button>
-            <Button Style="{StaticResource FadeOutButton}" IsEnabled="False" ToolTip="Phase 4"
+            <Button Style="{StaticResource FadeOutButton}"
                     Command="{Binding FadeOutCommand}">
                 <StackPanel>
                     <TextBlock Text="🔇 FADE OUT" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#66AAEE"/>
                     <TextBlock Text="↓0% + stop (toggle)" FontSize="11" HorizontalAlignment="Center" Foreground="#4488CC"/>
                 </StackPanel>
             </Button>
-            <Button Style="{StaticResource KillButton}" IsEnabled="False" ToolTip="Phase 4 (Esc)"
-                    Command="{Binding KillCommand}">
+            <Button Style="{StaticResource KillButton}"
+                    Command="{Binding KillCommand}" ToolTip="Esc">
                 <StackPanel>
                     <TextBlock Text="⚠ KILL" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Foreground="#FF6666"/>
                     <TextBlock Text="instant off" FontSize="11" HorizontalAlignment="Center" Foreground="#CC4444"/>

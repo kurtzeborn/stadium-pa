@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using NAudio.CoreAudioApi;
+using NAudio.CoreAudioApi.Interfaces;
 
 namespace StadiumPA.Services;
 
@@ -22,6 +23,19 @@ public sealed class SpotifyVolumeService : IDisposable
     /// Returns true if a Spotify process is currently running.
     /// </summary>
     public bool IsSpotifyRunning => FindSpotifyProcessId() is not null;
+
+    /// <summary>
+    /// Returns true if Spotify is actively producing audio (session state is Active).
+    /// Used by DIM/FADE OUT/KILL to avoid toggling Spotify that isn't playing.
+    /// </summary>
+    public bool IsSpotifyActive
+    {
+        get
+        {
+            var session = GetSpotifySession();
+            return session?.State == AudioSessionState.AudioSessionStateActive;
+        }
+    }
 
     /// <summary>
     /// Gets or sets Spotify's per-process volume (0.0 to 1.0).

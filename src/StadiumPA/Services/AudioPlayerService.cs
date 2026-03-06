@@ -14,6 +14,7 @@ public sealed class AudioPlayerService : IDisposable
     private WaveStream? _reader;
     private WaveOutEvent? _waveOut;
     private string? _filePath;
+    private float _volume = 1.0f;
 
     /// <summary>
     /// Fires periodically while playing, and once when playback stops.
@@ -24,6 +25,25 @@ public sealed class AudioPlayerService : IDisposable
     /// Whether audio is currently playing.
     /// </summary>
     public bool IsPlaying => _waveOut?.PlaybackState == PlaybackState.Playing;
+
+    /// <summary>
+    /// Whether audio is paused (can be resumed without restarting).
+    /// </summary>
+    public bool IsPaused => _waveOut?.PlaybackState == PlaybackState.Paused;
+
+    /// <summary>
+    /// Playback volume (0.0 to 1.0). Applied immediately if audio is playing.
+    /// </summary>
+    public float Volume
+    {
+        get => _volume;
+        set
+        {
+            _volume = Math.Clamp(value, 0f, 1f);
+            if (_waveOut is not null)
+                _waveOut.Volume = _volume;
+        }
+    }
 
     /// <summary>
     /// Current playback position, or zero if not loaded.
@@ -96,6 +116,7 @@ public sealed class AudioPlayerService : IDisposable
 
         _waveOut = new WaveOutEvent();
         _waveOut.Init(_reader);
+        _waveOut.Volume = _volume;
         _waveOut.PlaybackStopped += OnPlaybackStopped;
         _waveOut.Play();
 
@@ -110,6 +131,28 @@ public sealed class AudioPlayerService : IDisposable
         if (_waveOut is null) return;
 
         _waveOut.Stop();
+        PlaybackStateChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Pauses playback at the current position (can be resumed).
+    /// </summary>
+    public void Pause()
+    {
+        if (_waveOut?.PlaybackState != PlaybackState.Playing) return;
+
+        _waveOut.Pause();
+        PlaybackStateChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Resumes playback from the paused position.
+    /// </summary>
+    public void Resume()
+    {
+        if (_waveOut?.PlaybackState != PlaybackState.Paused) return;
+
+        _waveOut.Play();
         PlaybackStateChanged?.Invoke();
     }
 
