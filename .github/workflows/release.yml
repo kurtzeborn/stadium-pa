@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        rid: [win-x64, win-arm64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Extract version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $ver = "${{ github.ref_name }}" -replace '^v', ''
+          echo "VERSION=$ver" >> $env:GITHUB_OUTPUT
+
+      - name: Publish
+        shell: pwsh
+        run: |
+          dotnet publish src/StadiumPA/StadiumPA.csproj `
+            -c Release `
+            -r ${{ matrix.rid }} `
+            -p:Version=${{ steps.version.outputs.VERSION }} `
+            -o publish/${{ matrix.rid }}
+
+      - name: Copy media files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "publish/${{ matrix.rid }}/media" -Force | Out-Null
+          Copy-Item "media/*" -Destination "publish/${{ matrix.rid }}/media" -Recurse
+
+      - name: Create zip
+        shell: pwsh
+        run: |
+          $stageDir = "publish/stage/StadiumPA"
+          New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
+          Copy-Item "publish/${{ matrix.rid }}/*" -Destination $stageDir -Recurse
+          Compress-Archive -Path $stageDir -DestinationPath "publish/StadiumPA-${{ matrix.rid }}.zip" -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: StadiumPA-${{ matrix.rid }}
+          path: publish/StadiumPA-${{ matrix.rid }}.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: artifacts/**/*.zip
