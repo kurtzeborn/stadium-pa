@@ -1,5 +1,6 @@
 # release.ps1 — Tag and push to trigger a GitHub Actions release
 # Reads version from .csproj, creates a git tag, and pushes it.
+# If the version is already released, offers to bump and release the next version.
 # Usage: .\release.ps1
 
 $ErrorActionPreference = 'Stop'
@@ -24,11 +25,42 @@ if ($status) {
     exit 1
 }
 
-# Check if tag already exists
+# Check if tag already exists — offer to bump if so
 $existingTag = git tag -l $tag
 if ($existingTag) {
-    Write-Error "Tag '$tag' already exists. Bump the version in the .csproj first."
-    exit 1
+    Write-Host "Tag '$tag' already exists." -ForegroundColor Yellow
+
+    # Parse and bump patch version
+    $parts = $version -split '\.'
+    $major = [int]$parts[0]
+    $minor = [int]$parts[1]
+    $patch = if ($parts.Length -ge 3) { [int]$parts[2] } else { 0 }
+    $patch++
+    $newVersion = "$major.$minor.$patch"
+    $newTag = "v$newVersion"
+
+    Write-Host ""
+    Write-Host "Bump to $newVersion and release as '$newTag'?" -ForegroundColor Cyan
+    $bump = Read-Host "(y/n)"
+    if ($bump -ne 'y') {
+        Write-Host "Cancelled."
+        exit 0
+    }
+
+    # Update .csproj with new version
+    $content = Get-Content $projectFile -Raw
+    $content = $content -replace "<Version>$([regex]::Escape($version))</Version>", "<Version>$newVersion</Version>"
+    Set-Content $projectFile -Value $content -NoNewline
+
+    # Commit the version bump
+    git add $projectFile
+    git commit -m "Bump version to $newVersion"
+
+    $version = $newVersion
+    $tag = $newTag
+
+    Write-Host "Version bumped to $newVersion and committed." -ForegroundColor Green
+    Write-Host ""
 }
 
 Write-Host "Version: $version" -ForegroundColor Cyan
