@@ -332,16 +332,29 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         if (resumeSpotify)
         {
-            // Resume anything we paused (FadedOut state)
-            ResumeActiveAudio();
+            // Resume Spotify only — local players should NOT be resumed
+            // (e.g. goal horn was paused by fade-out; Timeout shouldn't restart it)
+            if (_spotifyWasPausedByUs)
+                MediaKeyService.PlayPause();
+
+            // Stop local players that were paused by fade rather than resuming them
+            if (_anthemWasPausedByUs)
+                _anthemPlayer.Stop();
+            if (_goalWasPausedByUs)
+                _goalPlayer.Stop();
         }
         else
         {
-            // Clear the paused-by-us flags without actually resuming
-            _spotifyWasPausedByUs = false;
-            _anthemWasPausedByUs = false;
-            _goalWasPausedByUs = false;
+            // Stop any playing local audio so the new command starts clean
+            if (_anthemWasPausedByUs)
+                _anthemPlayer.Stop();
+            if (_goalWasPausedByUs)
+                _goalPlayer.Stop();
         }
+
+        _spotifyWasPausedByUs = false;
+        _anthemWasPausedByUs = false;
+        _goalWasPausedByUs = false;
 
         SetAudioState(AudioControlState.Normal);
     }
