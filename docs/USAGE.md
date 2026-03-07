@@ -61,16 +61,16 @@ These buttons control whatever audio is currently active (Spotify, local audio, 
 
 ### Keyboard Hotkeys
 
-Hold **Alt** and press the indicated key. Hotkey badges appear on buttons when Alt is held:
+Hotkey badges appear on buttons when Alt is held. Available shortcuts:
 
 | Hotkey | Action |
 |--------|--------|
-| **Alt+D** | DIM toggle |
-| **Alt+F** | FADE OUT toggle |
-| **Alt+K** | KILL |
-| **Alt+G** | Goal Celebration |
-| **Alt+A** | National Anthem |
-| **Alt+Space** | Spotify Play/Pause |
+| **Ctrl+Space** | Spotify Play/Pause |
+| **Ctrl+Left** | Spotify Previous Track |
+| **Ctrl+Right** | Spotify Next Track |
+| **Ctrl+M** | Toggle Mute |
+| **Ctrl+T** | Timeout — Next Song |
+| **Esc** | KILL (instant silence) |
 
 ### Settings
 
