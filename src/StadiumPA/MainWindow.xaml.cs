@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System.Reflection;
+using System.Windows;
 using System.Windows.Input;
 using StadiumPA.ViewModels;
 
@@ -16,6 +17,12 @@ public partial class MainWindow : Window
         InitializeComponent();
         _viewModel = new MainViewModel();
         DataContext = _viewModel;
+
+        // Show version in title bar
+        var version = Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion ?? "unknown";
+        Title = $"STADIUM PA — v{version}";
 
         // Keyboard shortcuts
         InputBindings.Add(new KeyBinding(_viewModel.SpotifyPlayPauseCommand, Key.Space, ModifierKeys.Control));
@@ -39,6 +46,12 @@ public partial class MainWindow : Window
         base.OnActivated(e);
         // Refresh Spotify detection when window is focused
         _viewModel.RefreshSpotifyState();
+    }
+
+    private void OpenAboutDialog(object sender, RoutedEventArgs e)
+    {
+        var dialog = new AboutDialog { Owner = this, Topmost = Topmost };
+        dialog.ShowDialog();
     }
 
     protected override void OnClosed(EventArgs e)

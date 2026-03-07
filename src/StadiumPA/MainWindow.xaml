@@ -210,6 +210,9 @@
             <TextBlock Text="STADIUM PA" FontSize="22" FontWeight="Bold" Foreground="White"
                        VerticalAlignment="Center" DockPanel.Dock="Left"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Style="{StaticResource ToggleIconButton}" Content="⚙"
+                        Click="OpenAboutDialog" ToolTip="About / Settings"
+                        Opacity="0.5"/>
                 <Button Style="{StaticResource PinButton}"
                         Command="{Binding ToggleAlwaysOnTopCommand}"
                         ToolTip="Toggle Always on Top"/>

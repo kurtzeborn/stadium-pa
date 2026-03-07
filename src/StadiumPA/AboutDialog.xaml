@@ -1,0 +1,47 @@
+<Window x:Class="StadiumPA.AboutDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="About Stadium PA"
+        SizeToContent="WidthAndHeight" MinWidth="340"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="#1E1E1E"
+        ShowInTaskbar="False"
+        WindowStyle="ToolWindow">
+
+    <StackPanel Margin="24">
+        <TextBlock Text="Stadium PA" FontSize="24" FontWeight="Bold" Foreground="White"
+                   HorizontalAlignment="Center" Margin="0,0,0,4"/>
+        <TextBlock x:Name="VersionText" FontSize="14" Foreground="#AAA"
+                   HorizontalAlignment="Center" Margin="0,0,0,16"/>
+
+        <Separator Background="#444444" Margin="0,0,0,16"/>
+
+        <TextBlock Foreground="#CCC" FontSize="13" Margin="0,0,0,4">
+            Audio controller for lacrosse games.
+        </TextBlock>
+        <TextBlock Foreground="#CCC" FontSize="13" Margin="0,0,0,16">
+            Controls Spotify playback, local audio, and PA transitions.
+        </TextBlock>
+
+        <TextBlock Margin="0,0,0,8">
+            <Hyperlink x:Name="UsageLink" Foreground="#66AAEE" FontSize="13"
+                       RequestNavigate="Hyperlink_RequestNavigate"
+                       NavigateUri="https://github.com/kurtzeborn/stadium-pa/blob/main/docs/USAGE.md">
+                📖 Usage Guide
+            </Hyperlink>
+        </TextBlock>
+        <TextBlock Margin="0,0,0,16">
+            <Hyperlink x:Name="RepoLink" Foreground="#66AAEE" FontSize="13"
+                       RequestNavigate="Hyperlink_RequestNavigate"
+                       NavigateUri="https://github.com/kurtzeborn/stadium-pa">
+                🔗 GitHub Repository
+            </Hyperlink>
+        </TextBlock>
+
+        <Button Content="Close" Click="Close_Click"
+                Background="#333" Foreground="White" FontSize="13"
+                Padding="16,6" HorizontalAlignment="Center"
+                BorderBrush="#555" BorderThickness="1" Cursor="Hand"/>
+    </StackPanel>
+</Window>
