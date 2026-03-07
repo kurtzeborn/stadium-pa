@@ -1,15 +1,22 @@
 # publish.ps1 — Build self-contained single-file releases for both architectures
-# Usage: .\publish.ps1 [-Version "1.0.0"]
+# Usage: .\publish.ps1 [-Version "0.2.0"]  (defaults to version in .csproj)
 # Output: publish/StadiumPA-win-x64.zip, publish/StadiumPA-win-arm64.zip
 
 param(
-    [string]$Version = "1.0.0"
+    [string]$Version
 )
 
 $ErrorActionPreference = 'Stop'
 
 $projectDir = Join-Path $PSScriptRoot 'src\StadiumPA'
 $projectFile = Join-Path $projectDir 'StadiumPA.csproj'
+
+# Read version from .csproj if not specified
+if (-not $Version) {
+    [xml]$csproj = Get-Content $projectFile
+    $Version = $csproj.Project.PropertyGroup[0].Version
+    Write-Host "Using version from .csproj: $Version"
+}
 $mediaDir = Join-Path $PSScriptRoot 'media'
 $publishRoot = Join-Path $PSScriptRoot 'publish'
 $runtimes = @('win-x64', 'win-arm64')
