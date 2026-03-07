@@ -18,10 +18,12 @@ public partial class MainWindow : Window
         _viewModel = new MainViewModel();
         DataContext = _viewModel;
 
-        // Show version in title bar
+        // Show version in title bar (strip +commitsha suffix)
         var version = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion ?? "unknown";
+        var plusIndex = version.IndexOf('+');
+        if (plusIndex >= 0) version = version[..plusIndex];
         Title = $"STADIUM PA — v{version}";
 
         // Keyboard shortcuts
