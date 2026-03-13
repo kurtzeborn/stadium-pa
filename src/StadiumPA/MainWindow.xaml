@@ -329,7 +329,7 @@
                     <SolidColorBrush Color="{Binding IsAnthemPlaying, Converter={StaticResource PlayingBorderConverter}}"/>
                 </Button.BorderBrush>
                 <StackPanel>
-                    <TextBlock Text="🏳 NATIONAL" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="🦅 NATIONAL" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
                     <TextBlock Text="ANTHEM" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding AnthemTimeDisplay}" FontSize="12" HorizontalAlignment="Center" Foreground="#777"/>
                 </StackPanel>
@@ -340,7 +340,7 @@
                     <SolidColorBrush Color="{Binding IsGoalPlaying, Converter={StaticResource PlayingBorderConverter}}"/>
                 </Button.BorderBrush>
                 <StackPanel>
-                    <TextBlock Text="🥅 GOAL!" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="🎉 GOAL!" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
                     <TextBlock Text="CELEBRATION" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
                     <TextBlock Text="{Binding GoalTimeDisplay}" FontSize="12" HorizontalAlignment="Center" Foreground="#777"/>
                 </StackPanel>
