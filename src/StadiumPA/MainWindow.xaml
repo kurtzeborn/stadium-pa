@@ -58,7 +58,7 @@
 
         <!-- Large action button (Anthem, Goal, Timeout) -->
         <Style x:Key="LargeActionButton" TargetType="Button" BasedOn="{StaticResource TouchButton}">
-            <Setter Property="MinHeight" Value="90"/>
+            <Setter Property="MinHeight" Value="80"/>
             <Setter Property="FontSize" Value="18"/>
         </Style>
 
@@ -289,7 +289,7 @@
                     Value="{Binding SpotifyVolume, Mode=TwoWay}"
                     SmallChange="0.01" LargeChange="0.05"/>
         </DockPanel>
-        <UniformGrid Columns="3" Margin="8,0,8,8">
+        <UniformGrid Columns="3" Margin="8,0,8,4">
             <Button Style="{StaticResource TouchButton}" ToolTip="Ctrl+Left"
                     Command="{Binding SpotifyPrevCommand}">
                 <Grid>
@@ -318,11 +318,32 @@
                 </Grid>
             </Button>
         </UniformGrid>
+        <Button Style="{StaticResource LargeActionButton}" Margin="8,0,8,8"
+                Command="{Binding TimeoutNextSongCommand}"
+                ToolTip="Ctrl+T"
+                HorizontalContentAlignment="Center">
+            <Grid>
+                <TextBlock Text="⏱ TIMEOUT — NEXT SONG" FontSize="18" FontWeight="Bold"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Border Style="{StaticResource HotkeyBadge}">
+                    <TextBlock Text="Ctrl+T" FontSize="10" Foreground="White" FontWeight="Bold"/>
+                </Border>
+            </Grid>
+        </Button>
 
         <Separator Background="#444444" Margin="8,2"/>
 
-        <!-- ═══ ANTHEM / GOAL ═══ -->
-        <UniformGrid Columns="2" Margin="8,4,8,8">
+        <!-- ═══ SOUND EFFECTS ═══ -->
+        <TextBlock Style="{StaticResource SectionLabel}" Text="SOUND EFFECTS"/>
+        <DockPanel Margin="12,0,12,4">
+            <TextBlock Text="{Binding SfxVolumePercent}" Foreground="White" FontSize="16"
+                       Width="48" TextAlignment="Right" VerticalAlignment="Center"
+                       DockPanel.Dock="Right" Margin="8,0,0,0"/>
+            <Slider Style="{StaticResource DarkSlider}"
+                    Value="{Binding SfxVolume, Mode=TwoWay}"
+                    SmallChange="0.01" LargeChange="0.05"/>
+        </DockPanel>
+        <UniformGrid Columns="2" Margin="8,0,8,8">
             <Button Style="{StaticResource PlayingActionButton}"
                     Command="{Binding AnthemCommand}">
                 <Button.BorderBrush>
@@ -346,20 +367,6 @@
                 </StackPanel>
             </Button>
         </UniformGrid>
-
-        <!-- ═══ TIMEOUT ═══ -->
-        <Button Style="{StaticResource LargeActionButton}" Margin="8,0,8,12"
-                Command="{Binding TimeoutNextSongCommand}"
-                ToolTip="Ctrl+T"
-                HorizontalContentAlignment="Center">
-            <Grid>
-                <TextBlock Text="⏱ TIMEOUT — NEXT SONG" FontSize="18" FontWeight="Bold"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                <Border Style="{StaticResource HotkeyBadge}">
-                    <TextBlock Text="Ctrl+T" FontSize="10" Foreground="White" FontWeight="Bold"/>
-                </Border>
-            </Grid>
-        </Button>
 
         <!-- Settings -->
         <Separator Background="#444444" Margin="8,2"/>

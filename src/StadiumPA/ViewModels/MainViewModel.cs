@@ -30,13 +30,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private bool _alwaysOnTop = true;
 
     private float _spotifyVolumeLevel = 0.80f;
+    private float _sfxVolumeLevel = 1.0f;
     private bool _isSpotifyRunning;
 
     // Audio control state machine (Phase 4)
     private AudioControlState _audioState = AudioControlState.Normal;
     private float _savedSpotifyVol;
-    private float _savedAnthemVol = 1.0f;
-    private float _savedGoalVol = 1.0f;
+    private float _savedSfxVol = 1.0f;
     private bool _spotifyWasPausedByUs;
     private bool _anthemWasPausedByUs;
     private bool _goalWasPausedByUs;
@@ -55,6 +55,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _fadeDurationMs = _settings.FadeDurationMs;
         _alwaysOnTop = _settings.AlwaysOnTop;
         _savedSpotifyVol = _settings.DefaultSpotifyVolume;
+        _sfxVolumeLevel = _settings.DefaultSfxVolume;
 
         _masterVolume = new MasterVolumeService();
         _sleepSuppression = new SleepSuppressionService();
@@ -105,8 +106,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         // Local audio commands (reset fade state but DON'T resume Spotify — the
         // goal horn / anthem should play on its own without bringing Spotify back)
-        AnthemCommand = new RelayCommand(() => { ResetToNormalState(resumeSpotify: false); _anthemPlayer.Volume = 1.0f; _anthemPlayer.TogglePlayback(); }, () => _anthemPlayer.IsLoaded);
-        GoalCommand = new RelayCommand(() => { ResetToNormalState(resumeSpotify: false); _goalPlayer.Volume = 1.0f; _goalPlayer.TogglePlayback(); }, () => _goalPlayer.IsLoaded);
+        AnthemCommand = new RelayCommand(() => { ResetToNormalState(resumeSpotify: false); _anthemPlayer.Volume = _sfxVolumeLevel; _anthemPlayer.TogglePlayback(); }, () => _anthemPlayer.IsLoaded);
+        GoalCommand = new RelayCommand(() => { ResetToNormalState(resumeSpotify: false); _goalPlayer.Volume = _sfxVolumeLevel; _goalPlayer.TogglePlayback(); }, () => _goalPlayer.IsLoaded);
         BrowseAnthemFileCommand = new RelayCommand(BrowseAnthemFile);
         BrowseGoalFileCommand = new RelayCommand(BrowseGoalFile);
 
@@ -197,6 +198,22 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     public string SpotifyVolumePercent => $"{(int)(_spotifyVolumeLevel * 100)}%";
 
+    public float SfxVolume
+    {
+        get => _sfxVolumeLevel;
+        set
+        {
+            if (SetField(ref _sfxVolumeLevel, Math.Clamp(value, 0f, 1f)))
+            {
+                _anthemPlayer.Volume = _sfxVolumeLevel;
+                _goalPlayer.Volume = _sfxVolumeLevel;
+                OnPropertyChanged(nameof(SfxVolumePercent));
+            }
+        }
+    }
+
+    public string SfxVolumePercent => $"{(int)(_sfxVolumeLevel * 100)}%";
+
     public ICommand SpotifyPrevCommand { get; }
     public ICommand SpotifyPlayPauseCommand { get; }
     public ICommand SpotifyNextCommand { get; }
@@ -258,8 +275,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private void SaveActiveVolumes()
     {
         _savedSpotifyVol = _spotifyVolumeLevel;
-        _savedAnthemVol = _anthemPlayer.Volume;
-        _savedGoalVol = _goalPlayer.Volume;
+        _savedSfxVol = _sfxVolumeLevel;
     }
 
     /// <summary>
@@ -267,16 +283,20 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     /// slider to reflect the current fade position without re-applying the
     /// volume through the property setter (which would be redundant).
     /// </summary>
-    private void SetAllActiveVolumes(float spotifyVol, float anthemVol, float goalVol)
+    private void SetAllActiveVolumes(float spotifyVol, float sfxVol)
     {
         _spotifyVolume.Volume = spotifyVol;
-        _anthemPlayer.Volume = anthemVol;
-        _goalPlayer.Volume = goalVol;
+        _anthemPlayer.Volume = sfxVol;
+        _goalPlayer.Volume = sfxVol;
 
-        // Keep the slider in sync so the user sees real-time fade progress
+        // Keep sliders in sync so the user sees real-time fade progress
         _spotifyVolumeLevel = spotifyVol;
         OnPropertyChanged(nameof(SpotifyVolume));
         OnPropertyChanged(nameof(SpotifyVolumePercent));
+
+        _sfxVolumeLevel = sfxVol;
+        OnPropertyChanged(nameof(SfxVolume));
+        OnPropertyChanged(nameof(SfxVolumePercent));
     }
 
     private void PauseActiveAudio()
@@ -327,8 +347,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _spotifyVolumeLevel = _savedSpotifyVol;
         OnPropertyChanged(nameof(SpotifyVolume));
         OnPropertyChanged(nameof(SpotifyVolumePercent));
-        _anthemPlayer.Volume = _savedAnthemVol;
-        _goalPlayer.Volume = _savedGoalVol;
+        _anthemPlayer.Volume = _savedSfxVol;
+        _goalPlayer.Volume = _savedSfxVol;
+        _sfxVolumeLevel = _savedSfxVol;
+        OnPropertyChanged(nameof(SfxVolume));
+        OnPropertyChanged(nameof(SfxVolumePercent));
 
         if (resumeSpotify)
         {
@@ -367,14 +390,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private void FadeToLevel(float targetLevel, Action? onComplete = null)
     {
         var fromS = _spotifyVolume.Volume ?? _savedSpotifyVol;
-        var fromA = _anthemPlayer.Volume;
-        var fromG = _goalPlayer.Volume;
+        var fromSfx = _sfxVolumeLevel;
         _fader.Start(_fadeDurationMs, t =>
         {
             SetAllActiveVolumes(
                 Lerp(fromS, targetLevel, t),
-                Lerp(fromA, targetLevel, t),
-                Lerp(fromG, targetLevel, t));
+                Lerp(fromSfx, targetLevel, t));
         }, onComplete);
     }
 
@@ -384,14 +405,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private void FadeToSavedLevels()
     {
         var fromS = _spotifyVolume.Volume ?? 0f;
-        var fromA = _anthemPlayer.Volume;
-        var fromG = _goalPlayer.Volume;
+        var fromSfx = _sfxVolumeLevel;
         _fader.Start(_fadeDurationMs, t =>
         {
             SetAllActiveVolumes(
                 Lerp(fromS, _savedSpotifyVol, t),
-                Lerp(fromA, _savedAnthemVol, t),
-                Lerp(fromG, _savedGoalVol, t));
+                Lerp(fromSfx, _savedSfxVol, t));
         });
     }
 
@@ -456,7 +475,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             SaveActiveVolumes();
 
         // Instant volume cut
-        SetAllActiveVolumes(0f, 0f, 0f);
+        SetAllActiveVolumes(0f, 0f);
 
         // Stop all local audio playback
         if (_anthemPlayer.IsPlaying || _anthemPlayer.IsPaused) _anthemPlayer.Stop();
@@ -682,6 +701,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _settings.DimLevel = _dimLevel;
         _settings.DefaultMasterVolume = _masterVolumeLevel;
         _settings.DefaultSpotifyVolume = _spotifyVolumeLevel;
+        _settings.DefaultSfxVolume = _sfxVolumeLevel;
         _settings.AlwaysOnTop = _alwaysOnTop;
         SettingsService.Save(_settings);
     }

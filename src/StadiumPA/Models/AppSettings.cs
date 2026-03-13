@@ -24,6 +24,9 @@ public sealed class AppSettings
     /// <summary>Spotify volume on startup (0.0–1.0).</summary>
     public float DefaultSpotifyVolume { get; set; } = 0.80f;
 
+    /// <summary>Sound effects (anthem/goal) volume on startup (0.0–1.0).</summary>
+    public float DefaultSfxVolume { get; set; } = 1.0f;
+
     /// <summary>Keep window above all others.</summary>
     public bool AlwaysOnTop { get; set; } = true;
 }
