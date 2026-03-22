@@ -1,15 +1,19 @@
 using System.Diagnostics;
 using System.Reflection;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Navigation;
+using StadiumPA.ViewModels;
 
 namespace StadiumPA;
 
 public partial class AboutDialog : Window
 {
-    public AboutDialog()
+    public AboutDialog(MainViewModel viewModel)
     {
         InitializeComponent();
+        DataContext = viewModel;
+        
         var version = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
             ?.InformationalVersion ?? "unknown";
@@ -22,5 +26,5 @@ public partial class AboutDialog : Window
         e.Handled = true;
     }
 
-    private void Close_Click(object sender, RoutedEventArgs e) => Close();
+    private void CloseWindow_Executed(object sender, ExecutedRoutedEventArgs e) => Close();
 }

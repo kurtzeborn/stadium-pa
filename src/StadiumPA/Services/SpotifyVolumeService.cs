@@ -25,6 +25,15 @@ public sealed class SpotifyVolumeService : IDisposable
     }
 
     /// <summary>
+    /// Forces the cached session to be cleared and re-discovered on next access.
+    /// Useful when Spotify shifts audio between subprocesses or connection is lost.
+    /// </summary>
+    public void InvalidateCache()
+    {
+        _cachedSession = null;
+    }
+
+    /// <summary>
     /// Returns true if a Spotify process is currently running.
     /// </summary>
     public bool IsSpotifyRunning
@@ -53,16 +62,41 @@ public sealed class SpotifyVolumeService : IDisposable
     /// <summary>
     /// Gets or sets Spotify's per-process volume (0.0 to 1.0).
     /// Returns null if Spotify audio session is not found.
+    /// Invalidates cache on get/set failures to force fresh lookup on next access.
     /// </summary>
     public float? Volume
     {
-        get => GetSpotifySession()?.SimpleAudioVolume.Volume;
+        get
+        {
+            try
+            {
+                var session = GetSpotifySession();
+                if (session is null) return null;
+                var vol = session.SimpleAudioVolume.Volume;
+                return vol;
+            }
+            catch
+            {
+                // Cache became stale (Spotify shifted subprocess) — force refresh
+                _cachedSession = null;
+                return null;
+            }
+        }
         set
         {
-            var session = GetSpotifySession();
-            if (session is not null && value.HasValue)
+            if (!value.HasValue) return;
+            try
             {
-                session.SimpleAudioVolume.Volume = Math.Clamp(value.Value, 0f, 1f);
+                var session = GetSpotifySession();
+                if (session is not null)
+                {
+                    session.SimpleAudioVolume.Volume = Math.Clamp(value.Value, 0f, 1f);
+                }
+            }
+            catch
+            {
+                // Cache became stale — force refresh on next access
+                _cachedSession = null;
             }
         }
     }
@@ -91,21 +125,24 @@ public sealed class SpotifyVolumeService : IDisposable
     /// Finds the audio session belonging to Spotify by checking session identifiers
     /// for "Spotify.exe". This is more reliable than PID matching because Spotify
     /// (a Store/UWP app) can shift audio between subprocesses across tracks.
-    /// Cache is time-limited to 5 seconds to balance performance with freshness.
+    /// Cache is time-limited to 3 seconds (reduced from 5) to handle subprocess shifts faster.
+    /// Validates cached session is still alive AND has valid volume access before reusing.
     /// </summary>
     private AudioSessionControl? GetSpotifySession()
     {
-        // Use cached session if it's fresh (< 5 seconds old)
-        if (_cachedSession is not null && (DateTime.UtcNow - _cacheTimestamp).TotalSeconds < 5)
+        // Use cached session if it's fresh (< 3 seconds old) and still functional
+        if (_cachedSession is not null && (DateTime.UtcNow - _cacheTimestamp).TotalSeconds < 3)
         {
             try
             {
-                // Validate the COM object is still alive with a lightweight call
+                // Validate the session is still alive and accessible
                 _ = _cachedSession.GetProcessID;
+                _ = _cachedSession.SimpleAudioVolume.Volume; // Test volume access
                 return _cachedSession;
             }
             catch
             {
+                // Session became invalid — clear cache and search for new one
                 _cachedSession = null;
             }
         }
@@ -120,6 +157,8 @@ public sealed class SpotifyVolumeService : IDisposable
                 var id = session.GetSessionIdentifier;
                 if (id is not null && id.Contains("Spotify.exe", StringComparison.OrdinalIgnoreCase))
                 {
+                    // Validate the session is accessible before caching
+                    _ = session.SimpleAudioVolume.Volume;
                     _cachedSession = session;
                     _cacheTimestamp = DateTime.UtcNow;
                     return session;

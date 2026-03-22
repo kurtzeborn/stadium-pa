@@ -18,7 +18,7 @@ When the app launches, a checklist reminds you of these steps:
 
 1. **Open Spotify** — Launch Spotify desktop and start your pregame playlist
 2. **Set audio output** — Make sure your PA system is the default Windows audio device
-3. **Configure media files** — On first run, use the Settings panel to set file paths for the national anthem and goal celebration audio
+3. **Configure media files** — Click the **⚙ Settings** button (top-right), go to the Settings tab, and configure file paths for the national anthem and goal celebration
 4. **Test volume levels** — Use the master and Spotify sliders to verify levels through the PA
 
 ## Controls
@@ -74,10 +74,13 @@ Hotkey badges appear on buttons when Alt is held. Available shortcuts:
 
 ### Settings
 
-Click the **⚙ Settings** button to configure:
+Click the **⚙ Settings** button (top-right corner) to configure:
 
+**Audio Files:**
 - **Anthem file path** — file picker for the national anthem mp3
 - **Goal celebration file path** — file picker for the goal celebration mp3
+
+**Audio Control:**
 - **Dim level** — volume percentage for DIM mode (default 10%)
 - **Fade duration** — how long DIM/FADE OUT transitions take (default 1s)
 
@@ -113,3 +116,23 @@ Settings are persisted to `%APPDATA%\StadiumPA\settings.json` and restored on ne
 
 ### Emergency
 - Press **KILL** (or **Alt+K**) to instantly silence everything
+
+## Troubleshooting
+
+### Spotify Connection Issues
+
+**Symptom**: The Prev/Play/Next buttons work, but the Spotify volume slider doesn't control volume.
+
+**Status Indicator**: Look for the connection status below the Spotify volume slider:
+- 🟢 **Green dot + "Connected"** — Volume control is working
+- 🟠 **Orange dot + "Spotify running but not connected"** — Spotify is open but volume control isn't working
+- 🔴 **Red dot + "Spotify not detected"** — Spotify isn't running
+
+**Why this happens**: Spotify (being an Electron/UWP app) can shift audio between subprocesses, which breaks the volume control connection. The app now automatically checks every 5 seconds and attempts to reconnect.
+
+**Quick fix**:
+1. Click the **🔄 RECONNECT** button next to the status indicator
+2. If that doesn't work, restart Spotify (not the app)
+3. As a last resort, restart both Spotify and Stadium-PA
+
+**Prevention**: The app now automatically attempts to detect and recover from connection issues. The periodic refresh should minimize manual intervention.

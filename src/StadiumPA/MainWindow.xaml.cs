@@ -52,7 +52,7 @@ public partial class MainWindow : Window
 
     private void OpenAboutDialog(object sender, RoutedEventArgs e)
     {
-        var dialog = new AboutDialog { Owner = this, Topmost = Topmost };
+        var dialog = new AboutDialog(_viewModel) { Owner = this, Topmost = Topmost };
         dialog.ShowDialog();
     }
 

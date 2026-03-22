@@ -211,7 +211,7 @@
                        VerticalAlignment="Center" DockPanel.Dock="Left"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Style="{StaticResource ToggleIconButton}"
-                        Click="OpenAboutDialog" ToolTip="About / Settings"
+                        Click="OpenAboutDialog" ToolTip="Settings"
                         Opacity="0.5">
                     <TextBlock Text="&#xE713;" FontFamily="Segoe MDL2 Assets" FontSize="16"/>
                 </Button>
@@ -289,6 +289,56 @@
                     Value="{Binding SpotifyVolume, Mode=TwoWay}"
                     SmallChange="0.01" LargeChange="0.05"/>
         </DockPanel>
+        
+        <!-- Connection status indicator and reconnect button -->
+        <DockPanel Margin="12,0,12,8">
+            <Button Style="{StaticResource TouchButton}" 
+                    Command="{Binding ReconnectSpotifyCommand}"
+                    DockPanel.Dock="Right"
+                    MinHeight="36" MinWidth="100" Margin="8,0,0,0"
+                    ToolTip="Force Spotify volume reconnection">
+                <TextBlock Text="🔄 RECONNECT" FontSize="13"/>
+            </Button>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Ellipse Width="12" Height="12" Margin="0,0,8,0">
+                    <Ellipse.Style>
+                        <Style TargetType="Ellipse">
+                            <Setter Property="Fill" Value="#888888"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSpotifyConnected}" Value="True">
+                                    <Setter Property="Fill" Value="#4CAF50"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding IsSpotifyRunning}" Value="False">
+                                    <Setter Property="Fill" Value="#F44336"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Ellipse.Style>
+                </Ellipse>
+                <TextBlock FontSize="13" Foreground="#B0B0B0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Text" Value="Spotify not detected"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsSpotifyConnected}" Value="True">
+                                    <Setter Property="Text" Value="Connected"/>
+                                    <Setter Property="Foreground" Value="#4CAF50"/>
+                                </DataTrigger>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding IsSpotifyRunning}" Value="True"/>
+                                        <Condition Binding="{Binding IsSpotifyConnected}" Value="False"/>
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Text" Value="Spotify running but not connected"/>
+                                    <Setter Property="Foreground" Value="#FF9800"/>
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </StackPanel>
+        </DockPanel>
+        
         <UniformGrid Columns="3" Margin="8,0,8,4">
             <Button Style="{StaticResource TouchButton}" ToolTip="Ctrl+Left"
                     Command="{Binding SpotifyPrevCommand}">
@@ -367,49 +417,6 @@
                 </StackPanel>
             </Button>
         </UniformGrid>
-
-        <!-- Settings -->
-        <Separator Background="#444444" Margin="8,2"/>
-        <TextBlock Style="{StaticResource SectionLabel}" Text="SETTINGS"/>
-        <StackPanel Margin="12,0,12,4">
-            <DockPanel Margin="0,2">
-                <Button Style="{StaticResource ToggleIconButton}" Content="📂" DockPanel.Dock="Right"
-                        Command="{Binding BrowseAnthemFileCommand}" ToolTip="Browse for anthem file"
-                        MinWidth="40" MinHeight="30" Padding="6,2"/>
-                <TextBlock Foreground="#AAA" FontSize="12" VerticalAlignment="Center">
-                    <Run Text="Anthem: "/><Run Text="{Binding AnthemFileDisplay, Mode=OneWay}" Foreground="#DDD"/>
-                </TextBlock>
-            </DockPanel>
-            <DockPanel Margin="0,2">
-                <Button Style="{StaticResource ToggleIconButton}" Content="📂" DockPanel.Dock="Right"
-                        Command="{Binding BrowseGoalFileCommand}" ToolTip="Browse for goal file"
-                        MinWidth="40" MinHeight="30" Padding="6,2"/>
-                <TextBlock Foreground="#AAA" FontSize="12" VerticalAlignment="Center">
-                    <Run Text="Goal: "/><Run Text="{Binding GoalFileDisplay, Mode=OneWay}" Foreground="#DDD"/>
-                </TextBlock>
-            </DockPanel>
-            <!-- Dim Level & Fade Duration -->
-            <DockPanel Margin="0,6,0,2">
-                <TextBlock Text="{Binding DimLevelPercent}" Foreground="White" FontSize="13"
-                           Width="40" TextAlignment="Right" VerticalAlignment="Center"
-                           DockPanel.Dock="Right"/>
-                <TextBlock Text="Dim Level:" Foreground="#AAA" FontSize="12"
-                           VerticalAlignment="Center" Width="90"/>
-                <Slider Minimum="0.01" Maximum="0.50" SmallChange="0.01" LargeChange="0.05"
-                        Value="{Binding DimLevel, Mode=TwoWay}"
-                        Style="{StaticResource DarkSlider}"/>
-            </DockPanel>
-            <DockPanel Margin="0,2">
-                <TextBlock Text="{Binding FadeDurationDisplay}" Foreground="White" FontSize="13"
-                           Width="40" TextAlignment="Right" VerticalAlignment="Center"
-                           DockPanel.Dock="Right"/>
-                <TextBlock Text="Fade Speed:" Foreground="#AAA" FontSize="12"
-                           VerticalAlignment="Center" Width="90"/>
-                <Slider Minimum="0.2" Maximum="3.0" SmallChange="0.1" LargeChange="0.5"
-                        Value="{Binding FadeDurationSeconds, Mode=TwoWay}"
-                        Style="{StaticResource DarkSlider}"/>
-            </DockPanel>
-        </StackPanel>
 
         <!-- Status Message (hidden when empty) -->
         <TextBlock Text="{Binding StatusMessage}" Foreground="#FF8866" FontSize="12"

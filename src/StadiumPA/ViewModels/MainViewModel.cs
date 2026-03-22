@@ -22,6 +22,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private readonly AudioPlayerService _anthemPlayer;
     private readonly AudioPlayerService _goalPlayer;
     private readonly DispatcherTimer _playbackTimer;
+    private readonly DispatcherTimer _spotifyRefreshTimer; // Periodic Spotify state refresh
     private readonly VolumeFader _fader;
     private readonly AppSettings _settings;
 
@@ -32,6 +33,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private float _spotifyVolumeLevel = 0.80f;
     private float _sfxVolumeLevel = 1.0f;
     private bool _isSpotifyRunning;
+    private bool _isSpotifyConnected; // Whether we can actively control Spotify volume
 
     // Audio control state machine (Phase 4)
     private AudioControlState _audioState = AudioControlState.Normal;
@@ -67,6 +69,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         // Timer to update elapsed/total time display during playback
         _playbackTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _playbackTimer.Tick += (_, _) => RefreshPlaybackTimes();
+
+        // Timer to periodically refresh Spotify state (every 5 seconds)
+        // Helps detect when Spotify shifts audio between subprocesses
+        _spotifyRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _spotifyRefreshTimer.Tick += (_, _) => RefreshSpotifyState();
+        _spotifyRefreshTimer.Start();
 
         // Wire playback state changes to start/stop the timer
         _anthemPlayer.PlaybackStateChanged += OnAnyPlaybackStateChanged;
@@ -115,6 +123,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         DimCommand = new RelayCommand(ExecuteDim);
         FadeOutCommand = new RelayCommand(ExecuteFadeOut);
         KillCommand = new RelayCommand(ExecuteKill);
+
+        // Spotify reconnect command
+        ReconnectSpotifyCommand = new RelayCommand(ReconnectSpotify);
+
+        // Initial Spotify state check
+        RefreshSpotifyState();
     }
 
     #region Master Volume
@@ -183,6 +197,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         private set => SetField(ref _isSpotifyRunning, value);
     }
 
+    /// <summary>
+    /// Whether we can actively control Spotify's volume (session found and accessible).
+    /// False when Spotify is running but audio session is not available.
+    /// </summary>
+    public bool IsSpotifyConnected
+    {
+        get => _isSpotifyConnected;
+        private set => SetField(ref _isSpotifyConnected, value);
+    }
+
     public float SpotifyVolume
     {
         get => _spotifyVolumeLevel;
@@ -217,10 +241,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public ICommand SpotifyPrevCommand { get; }
     public ICommand SpotifyPlayPauseCommand { get; }
     public ICommand SpotifyNextCommand { get; }
+    public ICommand ReconnectSpotifyCommand { get; }
 
     /// <summary>
     /// Re-checks whether Spotify is running and syncs the volume slider.
     /// Called from code-behind on window activation or a timer.
+    /// Updates connection status based on volume access success.
     /// </summary>
     public void RefreshSpotifyState()
     {
@@ -228,6 +254,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         if (_isSpotifyRunning)
         {
             var current = _spotifyVolume.Volume;
+            IsSpotifyConnected = current.HasValue;
             if (current.HasValue)
             {
                 _spotifyVolumeLevel = current.Value;
@@ -235,7 +262,22 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 OnPropertyChanged(nameof(SpotifyVolumePercent));
             }
         }
+        else
+        {
+            IsSpotifyConnected = false;
+        }
         RefreshChecklist();
+    }
+
+    /// <summary>
+    /// Manually forces Spotify session refresh by invalidating cache.
+    /// Useful when volume controls stop working due to Spotify subprocess shift.
+    /// </summary>
+    private void ReconnectSpotify()
+    {
+        _spotifyVolume.InvalidateCache();
+        RefreshSpotifyState();
+        StatusMessage = _isSpotifyConnected ? "Spotify reconnected" : "Spotify not found";
     }
 
     /// <summary>
@@ -780,6 +822,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         SaveSettings();
         _fader.Dispose();
         _playbackTimer.Stop();
+        _spotifyRefreshTimer.Stop();
         _anthemPlayer.PlaybackStateChanged -= OnAnyPlaybackStateChanged;
         _goalPlayer.PlaybackStateChanged -= OnAnyPlaybackStateChanged;
         _anthemPlayer.Dispose();
