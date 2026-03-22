@@ -278,7 +278,19 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     {
         _spotifyVolume.InvalidateCache();
         RefreshSpotifyState();
-        StatusMessage = _isSpotifyConnected ? "Spotify reconnected" : "Spotify not found";
+        
+        if (_isSpotifyConnected)
+        {
+            StatusMessage = "Spotify reconnected successfully";
+        }
+        else if (_isSpotifyRunning)
+        {
+            StatusMessage = "Spotify is running but no audio session found. Try playing a song first.";
+        }
+        else
+        {
+            StatusMessage = "Spotify is not running. Please start Spotify.";
+        }
     }
 
     /// <summary>

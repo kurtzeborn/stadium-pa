@@ -147,8 +147,11 @@ public sealed class SpotifyVolumeService : IDisposable
             }
         }
 
-        // Enumerate sessions and match by identifier containing "Spotify.exe"
+        // Enumerate sessions and match by identifier containing "Spotify.exe" or by PID
+        var spotifyPids = FindSpotifyProcessIds();
         var sessions = _device.AudioSessionManager.Sessions;
+        
+        // First pass: try to find by session identifier (most reliable)
         for (int i = 0; i < sessions.Count; i++)
         {
             var session = sessions[i];
@@ -158,7 +161,7 @@ public sealed class SpotifyVolumeService : IDisposable
                 if (id is not null && id.Contains("Spotify.exe", StringComparison.OrdinalIgnoreCase))
                 {
                     // Validate the session is accessible before caching
-                    _ = session.SimpleAudioVolume.Volume;
+                    var vol = session.SimpleAudioVolume.Volume;
                     _cachedSession = session;
                     _cacheTimestamp = DateTime.UtcNow;
                     return session;
@@ -167,6 +170,31 @@ public sealed class SpotifyVolumeService : IDisposable
             catch
             {
                 // Skip sessions that throw on property access
+            }
+        }
+        
+        // Second pass: if no identifier match, try PID matching (fallback for Store version)
+        if (spotifyPids.Count > 0)
+        {
+            for (int i = 0; i < sessions.Count; i++)
+            {
+                var session = sessions[i];
+                try
+                {
+                    var pid = session.GetProcessID;
+                    if (spotifyPids.Contains(pid))
+                    {
+                        // Validate the session is accessible before caching
+                        var vol = session.SimpleAudioVolume.Volume;
+                        _cachedSession = session;
+                        _cacheTimestamp = DateTime.UtcNow;
+                        return session;
+                    }
+                }
+                catch
+                {
+                    // Skip sessions that throw on property access
+                }
             }
         }
 
