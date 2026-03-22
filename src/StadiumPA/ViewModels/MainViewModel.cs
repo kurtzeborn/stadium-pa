@@ -71,9 +71,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _playbackTimer.Tick += (_, _) => RefreshPlaybackTimes();
 
         // Timer to periodically refresh Spotify state (every 5 seconds)
-        // Helps detect when Spotify shifts audio between subprocesses
+        // Attempts connection if Spotify is running but not connected
         _spotifyRefreshTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
-        _spotifyRefreshTimer.Tick += (_, _) => RefreshSpotifyState();
+        _spotifyRefreshTimer.Tick += (_, _) => AutoRefreshSpotify();
         _spotifyRefreshTimer.Start();
 
         // Wire playback state changes to start/stop the timer
@@ -88,9 +88,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _masterVolume.Volume = _masterVolumeLevel;
         _isMuted = _masterVolume.IsMuted;
 
-        // Apply saved Spotify volume and connect
+        // Set saved Spotify volume (connection happens in RefreshSpotifyState() below)
         _spotifyVolumeLevel = _settings.DefaultSpotifyVolume;
-        ConnectToSpotify();
 
         // Pre-load audio files from saved paths
         TryLoadAudioFile(_anthemPlayer, _settings.AnthemFilePath, "Anthem");
@@ -240,43 +239,53 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public ICommand ReconnectSpotifyCommand { get; }
 
     /// <summary>
-    /// Re-checks whether Spotify is running and syncs the volume slider.
-    /// Called from code-behind on window activation or a timer.
-    /// Updates connection status based on volume access success.
+    /// Auto-refresh for the periodic timer. Attempts to connect if Spotify is running but not connected.
+    /// </summary>
+    private void AutoRefreshSpotify()
+    {
+        bool wasConnected = _isSpotifyConnected;
+        
+        // Always refresh state (handles both connection and reconnection)
+        RefreshSpotifyState();
+        
+        // Log successful auto-reconnection
+        if (!wasConnected && _isSpotifyConnected)
+        {
+            StatusMessage = "Spotify auto-connected";
+        }
+    }
+
+    /// <summary>
+    /// Re-checks whether Spotify is running and validates volume control access.
+    /// Tests both read AND write to ensure DIM/FADE will work (not just read-only access).
+    /// Called from code-behind on window activation, manual refresh, and periodic timer.
     /// </summary>
     public void RefreshSpotifyState()
     {
         IsSpotifyRunning = _spotifyVolume.IsSpotifyRunning;
-        if (_isSpotifyRunning)
-        {
-            var current = _spotifyVolume.Volume;
-            IsSpotifyConnected = current.HasValue;
-            if (current.HasValue)
-            {
-                _spotifyVolumeLevel = current.Value;
-                OnPropertyChanged(nameof(SpotifyVolume));
-                OnPropertyChanged(nameof(SpotifyVolumePercent));
-            }
-        }
-        else
+        
+        if (!_isSpotifyRunning)
         {
             IsSpotifyConnected = false;
+            RefreshChecklist();
+            return;
         }
-        RefreshChecklist();
-    }
 
-    /// <summary>
-    /// Connects to Spotify by checking if it's running and forcing session discovery.
-    /// Sets volume to trigger GetSpotifySession() search and cache.
-    /// </summary>
-    private void ConnectToSpotify()
-    {
-        _isSpotifyRunning = _spotifyVolume.IsSpotifyRunning;
-        if (_isSpotifyRunning)
+        // Test WRITE access first (forces session discovery and validates control works)
+        _spotifyVolume.Volume = _spotifyVolumeLevel;
+        
+        // Then verify READ access and sync UI with actual current volume
+        var current = _spotifyVolume.Volume;
+        IsSpotifyConnected = current.HasValue;
+        
+        if (current.HasValue)
         {
-            // Setting volume forces GetSpotifySession() to search for and cache the session
-            _spotifyVolume.Volume = _spotifyVolumeLevel;
+            _spotifyVolumeLevel = current.Value;
+            OnPropertyChanged(nameof(SpotifyVolume));
+            OnPropertyChanged(nameof(SpotifyVolumePercent));
         }
+        
+        RefreshChecklist();
     }
 
     /// <summary>
@@ -285,8 +294,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     /// </summary>
     private void ReconnectSpotify()
     {
+        // Clear stale session cache to force fresh discovery
         _spotifyVolume.InvalidateCache();
-        ConnectToSpotify();
+        
+        // Use standard refresh logic (tests write + read)
         RefreshSpotifyState();
         
         StatusMessage = _isSpotifyConnected 
