@@ -114,8 +114,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         // Local audio commands (reset fade state but DON'T resume Spotify — the
         // goal horn / anthem should play on its own without bringing Spotify back)
-        AnthemCommand = new RelayCommand(() => { ResetToNormalState(resumeSpotify: false); _anthemPlayer.Volume = _sfxVolumeLevel; _anthemPlayer.TogglePlayback(); }, () => _anthemPlayer.IsLoaded);
-        GoalCommand = new RelayCommand(() => { ResetToNormalState(resumeSpotify: false); _goalPlayer.Volume = _sfxVolumeLevel; _goalPlayer.TogglePlayback(); }, () => _goalPlayer.IsLoaded);
+        // Always play at full configured SFX volume, regardless of fade state
+        AnthemCommand = new RelayCommand(() => { ResetToNormalState(resumeSpotify: false); var vol = _savedSfxVol; _anthemPlayer.Volume = vol; _sfxVolumeLevel = vol; OnPropertyChanged(nameof(SfxVolume)); OnPropertyChanged(nameof(SfxVolumePercent)); _anthemPlayer.TogglePlayback(); }, () => _anthemPlayer.IsLoaded);
+        GoalCommand = new RelayCommand(() => { ResetToNormalState(resumeSpotify: false); var vol = _savedSfxVol; _goalPlayer.Volume = vol; _sfxVolumeLevel = vol; OnPropertyChanged(nameof(SfxVolume)); OnPropertyChanged(nameof(SfxVolumePercent)); _goalPlayer.TogglePlayback(); }, () => _goalPlayer.IsLoaded);
         BrowseAnthemFileCommand = new RelayCommand(BrowseAnthemFile);
         BrowseGoalFileCommand = new RelayCommand(BrowseGoalFile);
 
