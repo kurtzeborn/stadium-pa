@@ -88,13 +88,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _masterVolume.Volume = _masterVolumeLevel;
         _isMuted = _masterVolume.IsMuted;
 
-        // Apply saved Spotify volume
+        // Apply saved Spotify volume and connect
         _spotifyVolumeLevel = _settings.DefaultSpotifyVolume;
-        _isSpotifyRunning = _spotifyVolume.IsSpotifyRunning;
-        if (_isSpotifyRunning)
-        {
-            _spotifyVolume.Volume = _spotifyVolumeLevel;
-        }
+        ConnectToSpotify();
 
         // Pre-load audio files from saved paths
         TryLoadAudioFile(_anthemPlayer, _settings.AnthemFilePath, "Anthem");
@@ -114,9 +110,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
         // Local audio commands (reset fade state but DON'T resume Spotify — the
         // goal horn / anthem should play on its own without bringing Spotify back)
-        // Always play at full configured SFX volume, regardless of fade state
-        AnthemCommand = new RelayCommand(() => { ResetToNormalState(resumeSpotify: false); var vol = _savedSfxVol; _anthemPlayer.Volume = vol; _sfxVolumeLevel = vol; OnPropertyChanged(nameof(SfxVolume)); OnPropertyChanged(nameof(SfxVolumePercent)); _anthemPlayer.TogglePlayback(); }, () => _anthemPlayer.IsLoaded);
-        GoalCommand = new RelayCommand(() => { ResetToNormalState(resumeSpotify: false); var vol = _savedSfxVol; _goalPlayer.Volume = vol; _sfxVolumeLevel = vol; OnPropertyChanged(nameof(SfxVolume)); OnPropertyChanged(nameof(SfxVolumePercent)); _goalPlayer.TogglePlayback(); }, () => _goalPlayer.IsLoaded);
+        AnthemCommand = new RelayCommand(() => PlaySfxAtFullVolume(_anthemPlayer), () => _anthemPlayer.IsLoaded);
+        GoalCommand = new RelayCommand(() => PlaySfxAtFullVolume(_goalPlayer), () => _goalPlayer.IsLoaded);
         BrowseAnthemFileCommand = new RelayCommand(BrowseAnthemFile);
         BrowseGoalFileCommand = new RelayCommand(BrowseGoalFile);
 
@@ -271,26 +266,48 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     }
 
     /// <summary>
-    /// Manually forces Spotify session refresh by invalidating cache.
+    /// Connects to Spotify by checking if it's running and forcing session discovery.
+    /// Sets volume to trigger GetSpotifySession() search and cache.
+    /// </summary>
+    private void ConnectToSpotify()
+    {
+        _isSpotifyRunning = _spotifyVolume.IsSpotifyRunning;
+        if (_isSpotifyRunning)
+        {
+            // Setting volume forces GetSpotifySession() to search for and cache the session
+            _spotifyVolume.Volume = _spotifyVolumeLevel;
+        }
+    }
+
+    /// <summary>
+    /// Manually forces Spotify session refresh by invalidating cache and reconnecting.
     /// Useful when volume controls stop working due to Spotify subprocess shift.
     /// </summary>
     private void ReconnectSpotify()
     {
         _spotifyVolume.InvalidateCache();
+        ConnectToSpotify();
         RefreshSpotifyState();
         
-        if (_isSpotifyConnected)
-        {
-            StatusMessage = "Spotify reconnected successfully";
-        }
-        else if (_isSpotifyRunning)
-        {
-            StatusMessage = "Spotify is running but no audio session found. Try playing a song first.";
-        }
-        else
-        {
-            StatusMessage = "Spotify is not running. Please start Spotify.";
-        }
+        StatusMessage = _isSpotifyConnected 
+            ? "Spotify reconnected successfully" 
+            : _isSpotifyRunning 
+                ? "Spotify is running but no audio session found. Try playing a song first." 
+                : "Spotify is not running. Please start Spotify.";
+    }
+
+    /// <summary>
+    /// Resets fade state and plays SFX at full pre-fade volume.
+    /// </summary>
+    private void PlaySfxAtFullVolume(AudioPlayerService player)
+    {
+        ResetToNormalState(resumeSpotify: false);
+        var vol = _savedSfxVol;
+        player.Volume = vol;
+        _sfxVolumeLevel = vol;
+        OnPropertyChanged(nameof(SfxVolume));
+        OnPropertyChanged(nameof(SfxVolumePercent));
+        player.TogglePlayback();
     }
 
     /// <summary>
