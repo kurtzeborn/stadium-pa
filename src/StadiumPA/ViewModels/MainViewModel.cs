@@ -310,11 +310,23 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     /// <summary>
     /// Resets fade state and plays SFX at full pre-fade volume.
+    /// Safety: Ensures anthem/goal always play at reasonable volume (min 30%).
     /// </summary>
     private void PlaySfxAtFullVolume(AudioPlayerService player)
     {
         ResetToNormalState(resumeSpotify: false);
+        
+        // Safety check: ensure anthem/goal play at reasonable volume
+        // If saved volume is too low (< 30%), boost to 100% to avoid embarrassing situations
         var vol = _savedSfxVol;
+        const float minSafeVolume = 0.30f;
+        
+        if (vol < minSafeVolume)
+        {
+            vol = 1.0f; // Boost to 100%
+            _savedSfxVol = vol; // Update saved volume so subsequent plays also work
+        }
+        
         player.Volume = vol;
         _sfxVolumeLevel = vol;
         OnPropertyChanged(nameof(SfxVolume));
