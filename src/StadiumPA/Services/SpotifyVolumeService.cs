@@ -16,9 +16,6 @@ public sealed class SpotifyVolumeService : IDisposable
     // — critical during fades (~20 calls/sec).
     private AudioSessionControl? _cachedSession;
     private DateTime _cacheTimestamp;
-    
-    // Diagnostic tracking (temporary for debugging)
-    public string LastSearchInfo { get; private set; } = "";
 
     public SpotifyVolumeService()
     {
@@ -139,7 +136,6 @@ public sealed class SpotifyVolumeService : IDisposable
                 // Validate the session is still alive and accessible
                 _ = _cachedSession.GetProcessID;
                 _ = _cachedSession.SimpleAudioVolume.Volume; // Test volume access
-                LastSearchInfo = "Using cached session";
                 return _cachedSession;
             }
             catch
@@ -152,17 +148,10 @@ public sealed class SpotifyVolumeService : IDisposable
         // CRITICAL FIX: Get fresh device to ensure we see newly created audio sessions
         // The AudioSessionManager.Sessions collection becomes stale if we cache the device!
         using var device = _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
-        var sessionManager = device.AudioSessionManager;
-        var sessions = sessionManager.Sessions;
+        var sessions = device.AudioSessionManager.Sessions;
         
         // Enumerate sessions and match by identifier containing "Spotify.exe" or by PID
         var spotifyPids = FindSpotifyProcessIds();
-        
-        // Build diagnostic info about what we're searching
-        var sessionDetails = new System.Text.StringBuilder();
-        sessionDetails.Append($"{sessions.Count} sessions, {spotifyPids.Count} PIDs");
-        
-        LastSearchInfo = sessionDetails.ToString();
         
         // First pass: try to find by session identifier (most reliable)
         for (int i = 0; i < sessions.Count; i++)
@@ -177,8 +166,6 @@ public sealed class SpotifyVolumeService : IDisposable
                     var vol = session.SimpleAudioVolume.Volume;
                     _cachedSession = session;
                     _cacheTimestamp = DateTime.UtcNow;
-                    var shortId = id.Length > 40 ? id.Substring(0, 40) + "..." : id;
-                    LastSearchInfo = $"✓ by ID: {shortId}";
                     return session;
                 }
             }
@@ -203,7 +190,6 @@ public sealed class SpotifyVolumeService : IDisposable
                         var vol = session.SimpleAudioVolume.Volume;
                         _cachedSession = session;
                         _cacheTimestamp = DateTime.UtcNow;
-                        LastSearchInfo = $"✓ by PID: {pid}";
                         return session;
                     }
                 }
@@ -215,26 +201,6 @@ public sealed class SpotifyVolumeService : IDisposable
         }
 
         _cachedSession = null;
-        
-        // Enhanced diagnostic for failed searches - show what sessions we DID find
-        sessionDetails.Append(" | Sessions seen: ");
-        for (int i = 0; i < Math.Min(sessions.Count, 3); i++) // Show up to 3 sessions
-        {
-            try
-            {
-                var s = sessions[i];
-                var pid = s.GetProcessID;
-                var id = s.GetSessionIdentifier ?? "(null)";
-                var shortId = id.Length > 30 ? id.Substring(0, 30) + "..." : id;
-                sessionDetails.Append($"[PID:{pid} {shortId}] ");
-            }
-            catch
-            {
-                sessionDetails.Append("[error] ");
-            }
-        }
-        
-        LastSearchInfo = sessionDetails.ToString();
         return null;
     }
 

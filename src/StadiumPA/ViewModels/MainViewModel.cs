@@ -243,25 +243,15 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     /// </summary>
     private void AutoRefreshSpotify()
     {
-        bool wasRunning = _isSpotifyRunning;
         bool wasConnected = _isSpotifyConnected;
         
         // Always refresh state (handles both connection and reconnection)
         RefreshSpotifyState();
         
-        // Diagnostic output (remove after debugging)
-        if (!wasRunning && _isSpotifyRunning)
+        // Show success message when auto-connected
+        if (!wasConnected && _isSpotifyConnected)
         {
-            StatusMessage = $"Spotify process detected (connected: {_isSpotifyConnected})";
-        }
-        else if (wasRunning && !wasConnected && _isSpotifyConnected)
-        {
-            StatusMessage = "Spotify auto-connected ✓";
-        }
-        else if (_isSpotifyRunning && !_isSpotifyConnected)
-        {
-            // Spotify is running but no audio session found yet - show search details
-            StatusMessage = $"Waiting... [{_spotifyVolume.LastSearchInfo}]";
+            StatusMessage = "Spotify connected";
         }
     }
 
