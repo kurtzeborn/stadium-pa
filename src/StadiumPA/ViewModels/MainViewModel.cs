@@ -243,15 +243,25 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     /// </summary>
     private void AutoRefreshSpotify()
     {
+        bool wasRunning = _isSpotifyRunning;
         bool wasConnected = _isSpotifyConnected;
         
         // Always refresh state (handles both connection and reconnection)
         RefreshSpotifyState();
         
-        // Log successful auto-reconnection
-        if (!wasConnected && _isSpotifyConnected)
+        // Diagnostic output (remove after debugging)
+        if (!wasRunning && _isSpotifyRunning)
         {
-            StatusMessage = "Spotify auto-connected";
+            StatusMessage = $"Spotify process detected (connected: {_isSpotifyConnected})";
+        }
+        else if (wasRunning && !wasConnected && _isSpotifyConnected)
+        {
+            StatusMessage = "Spotify auto-connected ✓";
+        }
+        else if (_isSpotifyRunning && !_isSpotifyConnected)
+        {
+            // Spotify is running but no audio session found yet
+            StatusMessage = "Waiting for Spotify to play audio...";
         }
     }
 
@@ -271,16 +281,27 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        // Test WRITE access first (forces session discovery and validates control works)
+        // First try to READ current volume (tests if session exists and is accessible)
+        var current = _spotifyVolume.Volume;
+        
+        if (!current.HasValue)
+        {
+            // No session found (Spotify hasn't played audio yet, or session was lost)
+            IsSpotifyConnected = false;
+            RefreshChecklist();
+            return;
+        }
+        
+        // Session exists - now test WRITE access by setting volume
         _spotifyVolume.Volume = _spotifyVolumeLevel;
         
-        // Then verify READ access and sync UI with actual current volume
-        var current = _spotifyVolume.Volume;
-        IsSpotifyConnected = current.HasValue;
+        // Verify the write worked by reading back
+        var verified = _spotifyVolume.Volume;
+        IsSpotifyConnected = verified.HasValue;
         
-        if (current.HasValue)
+        if (verified.HasValue)
         {
-            _spotifyVolumeLevel = current.Value;
+            _spotifyVolumeLevel = verified.Value;
             OnPropertyChanged(nameof(SpotifyVolume));
             OnPropertyChanged(nameof(SpotifyVolumePercent));
         }
