@@ -260,8 +260,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
         else if (_isSpotifyRunning && !_isSpotifyConnected)
         {
-            // Spotify is running but no audio session found yet
-            StatusMessage = "Waiting for Spotify to play audio...";
+            // Spotify is running but no audio session found yet - show search details
+            StatusMessage = $"Waiting... [{_spotifyVolume.LastSearchInfo}]";
         }
     }
 

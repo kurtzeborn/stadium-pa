@@ -17,6 +17,9 @@ public sealed class SpotifyVolumeService : IDisposable
     // — critical during fades (~20 calls/sec).
     private AudioSessionControl? _cachedSession;
     private DateTime _cacheTimestamp;
+    
+    // Diagnostic tracking (temporary for debugging)
+    public string LastSearchInfo { get; private set; } = "";
 
     public SpotifyVolumeService()
     {
@@ -138,6 +141,7 @@ public sealed class SpotifyVolumeService : IDisposable
                 // Validate the session is still alive and accessible
                 _ = _cachedSession.GetProcessID;
                 _ = _cachedSession.SimpleAudioVolume.Volume; // Test volume access
+                LastSearchInfo = "Using cached session";
                 return _cachedSession;
             }
             catch
@@ -150,6 +154,8 @@ public sealed class SpotifyVolumeService : IDisposable
         // Enumerate sessions and match by identifier containing "Spotify.exe" or by PID
         var spotifyPids = FindSpotifyProcessIds();
         var sessions = _device.AudioSessionManager.Sessions;
+        
+        LastSearchInfo = $"Searching: {sessions.Count} sessions, {spotifyPids.Count} Spotify PIDs";
         
         // First pass: try to find by session identifier (most reliable)
         for (int i = 0; i < sessions.Count; i++)
@@ -164,6 +170,7 @@ public sealed class SpotifyVolumeService : IDisposable
                     var vol = session.SimpleAudioVolume.Volume;
                     _cachedSession = session;
                     _cacheTimestamp = DateTime.UtcNow;
+                    LastSearchInfo = $"Found by identifier: {id}";
                     return session;
                 }
             }
@@ -188,6 +195,7 @@ public sealed class SpotifyVolumeService : IDisposable
                         var vol = session.SimpleAudioVolume.Volume;
                         _cachedSession = session;
                         _cacheTimestamp = DateTime.UtcNow;
+                        LastSearchInfo = $"Found by PID: {pid}";
                         return session;
                     }
                 }
@@ -199,6 +207,7 @@ public sealed class SpotifyVolumeService : IDisposable
         }
 
         _cachedSession = null;
+        LastSearchInfo = $"NOT FOUND - {sessions.Count} sessions checked, {spotifyPids.Count} Spotify PIDs";
         return null;
     }
 
