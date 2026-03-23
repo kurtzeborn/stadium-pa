@@ -11,7 +11,6 @@ namespace StadiumPA.Services;
 public sealed class SpotifyVolumeService : IDisposable
 {
     private readonly MMDeviceEnumerator _enumerator;
-    private readonly MMDevice _device;
 
     // Cached session avoids repeated session enumeration on every call
     // — critical during fades (~20 calls/sec).
@@ -24,7 +23,6 @@ public sealed class SpotifyVolumeService : IDisposable
     public SpotifyVolumeService()
     {
         _enumerator = new MMDeviceEnumerator();
-        _device = _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
     }
 
     /// <summary>
@@ -151,9 +149,10 @@ public sealed class SpotifyVolumeService : IDisposable
             }
         }
 
-        // CRITICAL FIX: Query sessions fresh each time (don't rely on cached references)
-        // Re-get the session manager to ensure we see newly created sessions
-        var sessionManager = _device.AudioSessionManager;
+        // CRITICAL FIX: Get fresh device to ensure we see newly created audio sessions
+        // The AudioSessionManager.Sessions collection becomes stale if we cache the device!
+        using var device = _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+        var sessionManager = device.AudioSessionManager;
         var sessions = sessionManager.Sessions;
         
         // Enumerate sessions and match by identifier containing "Spotify.exe" or by PID
@@ -241,7 +240,6 @@ public sealed class SpotifyVolumeService : IDisposable
 
     public void Dispose()
     {
-        _device?.Dispose();
         _enumerator?.Dispose();
     }
 
@@ -262,7 +260,8 @@ public sealed class SpotifyVolumeService : IDisposable
         foreach (var p in allProcs) p.Dispose();
 
         sb.AppendLine();
-        var sessions = _device.AudioSessionManager.Sessions;
+        using var device = _enumerator.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+        var sessions = device.AudioSessionManager.Sessions;
         sb.AppendLine($"Audio sessions ({sessions.Count}):");
         for (int i = 0; i < sessions.Count; i++)
         {
