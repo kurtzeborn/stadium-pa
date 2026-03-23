@@ -281,27 +281,17 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             return;
         }
 
-        // First try to READ current volume (tests if session exists and is accessible)
-        var current = _spotifyVolume.Volume;
-        
-        if (!current.HasValue)
-        {
-            // No session found (Spotify hasn't played audio yet, or session was lost)
-            IsSpotifyConnected = false;
-            RefreshChecklist();
-            return;
-        }
-        
-        // Session exists - now test WRITE access by setting volume
+        // Always try to SET volume first (forces Windows to create audio session if it doesn't exist yet)
+        // This is critical for fixing the "Spotify playing but no audio session" issue
         _spotifyVolume.Volume = _spotifyVolumeLevel;
         
-        // Verify the write worked by reading back
-        var verified = _spotifyVolume.Volume;
-        IsSpotifyConnected = verified.HasValue;
+        // Now READ to verify the session exists and is accessible
+        var current = _spotifyVolume.Volume;
+        IsSpotifyConnected = current.HasValue;
         
-        if (verified.HasValue)
+        if (current.HasValue)
         {
-            _spotifyVolumeLevel = verified.Value;
+            _spotifyVolumeLevel = current.Value;
             OnPropertyChanged(nameof(SpotifyVolume));
             OnPropertyChanged(nameof(SpotifyVolumePercent));
         }
