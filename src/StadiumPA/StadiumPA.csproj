@@ -10,6 +10,7 @@
     <Version>0.3.0</Version>
     <Authors>K61</Authors>
     <Description>Stadium PA audio controller for lacrosse games</Description>
+    <NoWarn>NU1900</NoWarn>
   </PropertyGroup>
 
   <!-- Publish settings: self-contained single-file EXE -->
