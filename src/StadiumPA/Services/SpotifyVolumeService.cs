@@ -206,6 +206,17 @@ public sealed class SpotifyVolumeService : IDisposable
 
     public void Dispose()
     {
+        // Reset Spotify volume to 100% on exit to clear per-app volume override.
+        // This prevents Spotify from being stuck at a low volume after Stadium PA closes.
+        try
+        {
+            Volume = 1.0f;
+        }
+        catch
+        {
+            // Spotify might not be running or session might be gone - ignore
+        }
+        
         _enumerator?.Dispose();
     }
 
