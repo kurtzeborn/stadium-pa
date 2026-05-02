@@ -148,6 +148,7 @@
             <Setter Property="Minimum" Value="0"/>
             <Setter Property="Maximum" Value="1"/>
             <Setter Property="IsSnapToTickEnabled" Value="False"/>
+            <Setter Property="IsMoveToPointEnabled" Value="True"/>
             <Setter Property="Height" Value="30"/>
             <Setter Property="Margin" Value="8,0"/>
             <Setter Property="VerticalAlignment" Value="Center"/>

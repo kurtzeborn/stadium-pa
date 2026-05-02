@@ -211,6 +211,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             {
                 _spotifyVolume.Volume = _spotifyVolumeLevel;
                 OnPropertyChanged(nameof(SpotifyVolumePercent));
+                _savedSpotifyVol = _spotifyVolumeLevel;
+                if (_audioState != AudioControlState.Normal)
+                    CancelFadeAndResetState();
             }
         }
     }
@@ -227,6 +230,9 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
                 _anthemPlayer.Volume = _sfxVolumeLevel;
                 _goalPlayer.Volume = _sfxVolumeLevel;
                 OnPropertyChanged(nameof(SfxVolumePercent));
+                _savedSfxVol = _sfxVolumeLevel;
+                if (_audioState != AudioControlState.Normal)
+                    CancelFadeAndResetState();
             }
         }
     }
@@ -375,6 +381,22 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     }
 
     /// <summary>
+    /// Cancels any active fade and returns to Normal state, snapshotting
+    /// current slider positions as the saved volumes. Called when the user
+    /// manually drags a volume slider, overriding any dim/fade in progress.
+    /// </summary>
+    private void CancelFadeAndResetState()
+    {
+        _fader.Cancel();
+        _savedSpotifyVol = _spotifyVolumeLevel;
+        _savedSfxVol = _sfxVolumeLevel;
+        _spotifyWasPausedByUs = false;
+        _anthemWasPausedByUs = false;
+        _goalWasPausedByUs = false;
+        SetAudioState(AudioControlState.Normal);
+    }
+
+    /// <summary>
     /// Sets volume on all active audio sources directly, updating the Spotify
     /// slider to reflect the current fade position without re-applying the
     /// volume through the property setter (which would be redundant).
@@ -512,12 +534,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private void ExecuteDim()
     {
+        bool wasFading = _fader.IsFading;
         _fader.Cancel();
 
         switch (_audioState)
         {
             case AudioControlState.Normal:
-                SaveActiveVolumes();
+                if (!wasFading)
+                    SaveActiveVolumes();
                 SetAudioState(AudioControlState.Dimmed);
                 FadeToLevel(_dimLevel);
                 break;
@@ -534,12 +558,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private void ExecuteFadeOut()
     {
+        bool wasFading = _fader.IsFading;
         _fader.Cancel();
 
         switch (_audioState)
         {
             case AudioControlState.Normal:
-                SaveActiveVolumes();
+                if (!wasFading)
+                    SaveActiveVolumes();
                 SetAudioState(AudioControlState.FadedOut);
                 FadeToLevel(0f, PauseActiveAudio);
                 break;
@@ -562,12 +588,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
 
     private void ExecuteKill()
     {
+        bool wasFading = _fader.IsFading;
         _fader.Cancel();
         if (_audioState == AudioControlState.Killed) return;
 
         // Dimmed/FadedOut states already saved volumes on entry;
         // only need to capture if coming directly from Normal.
-        if (_audioState == AudioControlState.Normal)
+        if (_audioState == AudioControlState.Normal && !wasFading)
             SaveActiveVolumes();
 
         // Instant volume cut
